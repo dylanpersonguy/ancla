@@ -14,8 +14,16 @@ importers:
       '@decentralchain/ts-lib-crypto':
         specifier: ^2.0.0
         version: 2.0.0
+    devDependencies:
+      marked:
+        specifier: ^18.0.11
+        version: 18.0.11
+
+  packages/anchor: {}
 
   packages/canonicalize: {}
+
+  packages/cli: {}
 
   packages/differ: {}
 
@@ -73,6 +81,11 @@ packages:
 
   long@5.3.2:
     resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
+
+  marked@18.0.11:
+    resolution: {integrity: sha512-HnslJfsZkRPBDJRHvVtAaWlZHEpSu7u8LgQuJCELjRKuWR+hpq4A7sLq3p8HaI9ypVoXDXxV34CsQJEe1+J5Aw==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   protobufjs@8.8.0:
     resolution: {integrity: sha512-N3xhQ5yyBx3vQq4gubBfASzYhJGNzeDbjqBpu61g7UVylsN/qyffU96TKWD3GbbLOKF82VGNRNvv1+BFgE31Eg==}
@@ -134,6 +147,8 @@ snapshots:
   bignumber.js@10.0.2: {}
 
   long@5.3.2: {}
+
+  marked@18.0.11: {}
 
   protobufjs@8.8.0:
     dependencies:
