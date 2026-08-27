@@ -14,7 +14,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { marked } from 'marked';
 
-const [, , mdPath, titleArg, subtitleArg, langArg] = process.argv;
+const [, , mdPath, titleArg, subtitleArg, langArg, modeArg] = process.argv;
+const COMPACT = modeArg === 'compact';
 if (!mdPath) {
   process.stderr.write('usage: node docs/render.mjs <file.md> [title] [subtitle]\n');
   process.exit(1);
@@ -57,7 +58,9 @@ const abstract = marked.parse(abstractMd);
 let body = marked.parse(bodyMd);
 
 // Break before each top-level numbered section except the first.
-body = body.replace(/<h2>(\d+)\./g, (m, n) => (n === '1' ? m : `<h2 class="brk">${n}.`));
+if (!COMPACT) {
+  body = body.replace(/<h2>(\d+)\./g, (m, n) => (n === '1' ? m : `<h2 class="brk">${n}.`));
+}
 // Split the section number out so it can be set in mono indigo.
 body = body.replace(/<h2([^>]*)>(\d+(?:\.\d+)?)\.\s*/g, '<h2$1><span class="n">$2</span>');
 body = body.replace(/<h3([^>]*)>(\d+(?:\.\d+)*)\s*/g, '<h3$1><span class="n">$2</span>');
@@ -114,7 +117,7 @@ body{
 
 /* headings */
 h2{
-  font-size:17pt;font-weight:600;letter-spacing:-.01em;margin:11mm 0 4mm;
+  font-size:${COMPACT ? '15' : '17'}pt;font-weight:600;letter-spacing:-.01em;margin:${COMPACT ? '8mm' : '11mm'} 0 4mm;
   padding-bottom:2.5mm;border-bottom:1px solid var(--rule);
 }
 h2.brk{page-break-before:always;margin-top:0;}
