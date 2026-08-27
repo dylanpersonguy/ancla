@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Verificar · Ancla</title>
+    <meta
+      name="description"
+      content="Compruebe que un registro de compra pública coincide con la raíz Merkle anclada en DecentralChain. Todo el cálculo ocurre en su navegador."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./ancla.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <a class="wordmark" href="./index.html">Ancla</a>
+        <nav>
+          <a href="./index.html" data-t="nav.changes">Cambios</a>
+          <a href="./verify.html" aria-current="page" data-t="nav.verify">Verificar</a>
+          <a href="/api" data-t="nav.api">API</a>
+        </nav>
+        <div class="langs" role="group" data-t-title="lang.switch">
+          <button type="button" data-lang="es">ES</button>
+          <button type="button" data-lang="en">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div id="banner" class="banner hidden"></div>
+
+      <div class="prose">
+        <p class="eyebrow" data-t="app.tagline"></p>
+        <h1 data-t="verify.title" data-t-document-title="verify.title">Verificar un registro</h1>
+        <p class="lede" data-t="verify.intro"></p>
+      </div>
+
+      <h2 data-t="verify.lookup">Buscar por número de procedimiento</h2>
+      <p class="note" data-t="verify.lookup.hint"></p>
+      <form class="filters" id="lookup">
+        <div class="field">
+          <label for="l-sicop" data-t="verify.lookup.id"></label>
+          <input id="l-sicop" name="id" required placeholder="20250700100" />
+        </div>
+        <div class="field">
+          <label for="l-month" data-t="verify.lookup.month"></label>
+          <select id="l-month" name="month"></select>
+        </div>
+        <div class="field" style="min-width: 14rem">
+          <label for="l-table" data-t="verify.lookup.table"></label>
+          <select id="l-table" name="table"></select>
+        </div>
+        <div class="row" style="margin: 0">
+          <button type="submit" data-t="verify.lookup.fetch"></button>
+        </div>
+      </form>
+
+      <h2 data-t="verify.proof">Prueba</h2>
+      <textarea id="proof" spellcheck="false" data-t-placeholder="verify.proof.placeholder"></textarea>
+
+      <h2 data-t="verify.account">Cuenta ancla</h2>
+      <input id="addr" spellcheck="false" data-t-placeholder="verify.account.placeholder" />
+
+      <h2 data-t="verify.node">Nodo consultado</h2>
+      <input id="node" spellcheck="false" data-t-placeholder="verify.node.placeholder" />
+      <p class="note" data-t="verify.node.hint"></p>
+
+      <div class="row">
+        <button type="button" id="go" data-t="verify.run"></button>
+        <button type="button" class="ghost" id="sample" data-t="verify.sample"></button>
+      </div>
+
+      <div id="result"></div>
+
+      <p class="note" data-t="note.provesWhat"></p>
+      <p class="note" data-t="note.forwardOnly"></p>
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <p data-t="note.sourceIsSicop"></p>
+        <p class="mono" id="anchor-line"></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./verify.js"></script>
+  </body>
+</html>

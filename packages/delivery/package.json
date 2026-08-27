@@ -1,0 +1,8 @@
+{
+  "name": "@ancla/delivery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "REST API, OCDS export, alerts and the hosted web app",
+  "license": "MIT"
+}
