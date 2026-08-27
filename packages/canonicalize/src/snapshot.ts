@@ -7,9 +7,9 @@
  * both the raw evidence and its canonical reduction.
  */
 
-import { createGzip, gunzipSync } from 'node:zlib';
+import { createGunzip, createGzip, gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { Readable } from 'node:stream';
@@ -106,6 +106,31 @@ export async function writeSnapshot(path: string, snap: Snapshot): Promise<void>
     }
   }
   await pipeline(Readable.from(lines()), createGzip(), createWriteStream(path));
+}
+
+/**
+ * Read only the header line of a snapshot.
+ *
+ * Anchoring needs the root, the month and the record count, not the records.
+ * Fully decompressing every snapshot to get four fields would mean unpacking
+ * gigabytes, so stop the gunzip stream as soon as the first newline arrives.
+ */
+export async function readSnapshotHeader(path: string): Promise<Omit<Snapshot, 'records'>> {
+  const gunzip = createGunzip();
+  const source = createReadStream(path);
+  source.pipe(gunzip);
+  let buf = '';
+  try {
+    for await (const chunk of gunzip) {
+      buf += chunk.toString('utf8');
+      const nl = buf.indexOf('\n');
+      if (nl >= 0) return JSON.parse(buf.slice(0, nl));
+    }
+  } finally {
+    source.destroy();
+    gunzip.destroy();
+  }
+  throw new Error(`no header line in ${path}`);
 }
 
 export async function readSnapshot(path: string): Promise<Snapshot> {

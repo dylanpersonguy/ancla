@@ -19,9 +19,9 @@ import { proof, root as merkleRoot, verify as merkleVerify } from '../../merkle/
 import { diff, summarize } from '../../differ/src/index.ts';
 import {
   balance, broadcast, generateKey, height, keyExists, keyPath, loadKeys,
-  MAINNET_CHAIN_ID, planAnchor, readRoot, signAnchor, version,
+  MAINNET_CHAIN_ID, planAnchor, planAnchorBatched, readRoot, signAnchor, version,
 } from '../../anchor/src/index.ts';
-import { archives, loadOrBuild, months, snapshotPath } from './store.ts';
+import { allSnapshotHeaders, archives, loadOrBuild, months, snapshotPath } from './store.ts';
 import { reportText, runWatch, writeReport } from './watch.ts';
 
 const out = (s = '') => process.stdout.write(`${s}\n`);
@@ -34,6 +34,7 @@ function parseArgs(argv: string[]) {
     if (a === '--broadcast') flags.broadcast = true;
     else if (a === '--yes') flags.yes = true;
     else if (a === '--force') flags.force = true;
+    else if (a === '--all') flags.all = true;
     else if (a.startsWith('--')) flags[a.slice(2)] = argv[++i];
     else positional.push(a);
   }
@@ -100,6 +101,11 @@ async function cmdKeygen(flags: Record<string, string | boolean>): Promise<void>
 
 async function cmdAnchor(flags: Record<string, string | boolean>): Promise<void> {
   const day = (flags.day as string) ?? new Date().toISOString().slice(0, 10);
+
+  // --all anchors every snapshotted month. That needs more entries than one
+  // transaction holds, so it batches. Everything else anchors a single month.
+  if (flags.all) return cmdAnchorAll(day, flags);
+
   const list = flags.month ? [flags.month as string] : (await months()).slice(-1);
   const snaps = [];
   for (const m of list) {
@@ -141,6 +147,56 @@ async function cmdAnchor(flags: Record<string, string | boolean>): Promise<void>
   out('');
   out(`broadcast ${res.id}`);
   out(`verify:   ancla node   (or read root_${day}_${plan.roots[0].month} on ${keys.address})`);
+}
+
+async function cmdAnchorAll(
+  day: string,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  const heads = await allSnapshotHeaders();
+  if (!heads.length) {
+    out('no snapshots. run: ancla snapshot');
+    return;
+  }
+  const batches = planAnchorBatched(day, heads as never);
+  const records = heads.reduce((s, h) => s + h.recordCount, 0);
+  const entries = batches.reduce((s, b) => s + b.entries.length, 0);
+
+  out(`historical backfill for ${day}`);
+  out(`  months      ${heads.length}  (${heads[0].month} to ${heads[heads.length - 1].month})`);
+  out(`  records     ${records.toLocaleString()}`);
+  out(`  entries     ${entries}  across ${batches.length} transactions`);
+  batches.forEach((b, i) =>
+    out(`    batch ${i + 1}  ${String(b.roots.length).padStart(3)} months  ${b.entries.length} entries`),
+  );
+
+  if (!flags.broadcast) {
+    out('');
+    out('dry run. nothing was sent.');
+    out('to broadcast: rerun with --broadcast');
+    return;
+  }
+
+  const keys = await loadKeys(MAINNET_CHAIN_ID);
+  const bal = await balance(keys.address);
+  const signed = batches.map((b, i) => signAnchor(b, keys.privateKey, keys.publicKey, Date.now() + i));
+  const totalFee = signed.reduce((s, t) => s + t.fee, 0);
+  out('');
+  out(`  sender  ${keys.address}`);
+  out(`  balance ${(bal / 1e8).toFixed(8)} DCC`);
+  out(`  fee     ${(totalFee / 1e8).toFixed(8)} DCC total`);
+  if (bal < totalFee) {
+    out(`insufficient balance. need ${(totalFee / 1e8).toFixed(8)} DCC.`);
+    process.exitCode = 1;
+    return;
+  }
+  out('');
+  for (let i = 0; i < signed.length; i++) {
+    const res = await broadcast(signed[i]);
+    out(`  batch ${i + 1}/${signed.length}  ${res.id}`);
+  }
+  out('');
+  out(`${heads.length} monthly roots anchored on ${day}`);
 }
 
 async function cmdProve(month: string, table: string, id: string, day?: string): Promise<void> {
@@ -240,7 +296,7 @@ try {
           '  status                        what we hold and what has changed',
           '  snapshot [month...]           canonicalize into Merkle-rooted snapshots',
           '  diff <YYYYMM>                 compare a month’s two most recent versions',
-          '  keygen                        create the anchor account (seed stays on disk)\n  anchor [--day D] [--month M]  commit roots to DecentralChain',
+          '  keygen                        create the anchor account (seed stays on disk)\n  anchor [--day D] [--month M]  commit roots to DecentralChain\n         [--all]                every snapshotted month, batched',
           '         [--broadcast]          without --broadcast this is a dry run',
           '  watch [--from M] [--to M]     the daily job: refetch, diff, report\n  prove <YYYYMM> <Table> <id>   Merkle proof for one record\n         [--day YYYY-MM-DD]     stamp the anchored day into the proof',
           '  node                          chain reachability check',

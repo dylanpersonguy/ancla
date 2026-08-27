@@ -15,7 +15,7 @@
  */
 
 import type { Snapshot } from '../../canonicalize/src/snapshot.ts';
-import { type DataEntry, type SignedDataTx, signDataTx } from './datatx.ts';
+import { type DataEntry, MAX_ENTRIES, type SignedDataTx, signDataTx } from './datatx.ts';
 
 export type AnchorPlan = {
   day: string;
@@ -41,6 +41,40 @@ export function planAnchor(day: string, snapshots: Snapshot[]): AnchorPlan {
   }
   entries.push({ key: 'latest', type: 'string', value: day });
   return { day, entries, roots };
+}
+
+/**
+ * Split a set of snapshots across transactions that each fit the node's limits.
+ *
+ * A DataTransaction holds at most 100 entries and 150 KB. Each month costs two
+ * entries (root and meta), so a full historical backfill of 189 months needs four
+ * transactions rather than one. The "latest" marker goes on the final batch so it
+ * is only set once the whole set has landed.
+ */
+export function planAnchorBatched(
+  day: string,
+  snapshots: Snapshot[],
+  maxEntries = MAX_ENTRIES,
+): AnchorPlan[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('day must be YYYY-MM-DD');
+  const perBatch = Math.floor((maxEntries - 1) / 2);
+  if (perBatch < 1) throw new Error('maxEntries too small to hold one month');
+
+  const batches: AnchorPlan[] = [];
+  for (let i = 0; i < snapshots.length; i += perBatch) {
+    const chunk = snapshots.slice(i, i + perBatch);
+    const isLast = i + perBatch >= snapshots.length;
+    const entries: DataEntry[] = [];
+    const roots: AnchorPlan['roots'] = [];
+    for (const s of chunk) {
+      entries.push({ key: `root_${day}_${s.month}`, type: 'string', value: s.merkleRoot });
+      entries.push({ key: `meta_${day}_${s.month}`, type: 'string', value: metaString(s) });
+      roots.push({ day, root: s.merkleRoot, month: s.month, recordCount: s.recordCount });
+    }
+    if (isLast) entries.push({ key: 'latest', type: 'string', value: day });
+    batches.push({ day, entries, roots });
+  }
+  return batches;
 }
 
 export function signAnchor(

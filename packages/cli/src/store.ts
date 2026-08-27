@@ -3,7 +3,9 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { dataRoot } from '../../ingest/src/manifest.ts';
-import { buildSnapshot, readSnapshot, type Snapshot } from '../../canonicalize/src/snapshot.ts';
+import {
+  buildSnapshot, readSnapshot, readSnapshotHeader, type Snapshot,
+} from '../../canonicalize/src/snapshot.ts';
 
 export type ArchiveRef = { month: string; file: string; path: string; stamp: string };
 
@@ -41,4 +43,22 @@ export async function loadOrBuild(ref: ArchiveRef): Promise<Snapshot> {
   } catch {
     return buildSnapshot(ref.month, await readFile(ref.path));
   }
+}
+
+/**
+ * Header-only view of the newest stored snapshot per month, for anchoring.
+ * Reads four fields rather than unpacking gigabytes of records.
+ */
+export async function allSnapshotHeaders(): Promise<Omit<Snapshot, 'records'>[]> {
+  const out: Omit<Snapshot, 'records'>[] = [];
+  for (const month of await months()) {
+    const refs = await archives(month);
+    if (!refs.length) continue;
+    try {
+      out.push(await readSnapshotHeader(snapshotPath(refs[refs.length - 1])));
+    } catch {
+      // Not snapshotted yet. Skip rather than silently anchoring a stale root.
+    }
+  }
+  return out;
 }
