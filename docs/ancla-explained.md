@@ -321,13 +321,13 @@ The near-term value is already banked regardless of how that goes. From 27 Augus
 
 Every figure in this document traces to one of these.
 
-1. Observatorio de Compra Pública, SICOP bulk downloads — `observatoriocomprapublica.go.cr/descargas-sicop/`
-2. Contraloría General de la República, DFOE-CAP-SGP-00005-2021 — the 27.1% and the 9-of-182 findings
+1. Observatorio de Compra Pública, SICOP bulk downloads. `observatoriocomprapublica.go.cr/descargas-sicop/`
+2. Contraloría General de la República, DFOE-CAP-SGP-00005-2021. Source of the 27.1% and the 9-of-182 findings
 3. Diario Extra, on ₡542,505 million in purchases outside SICOP
-4. World Economic Forum, *Exploring Blockchain Technology for Government Transparency* — Colombia programme
-5. IDB Lab, LACChain and LACNet becoming LNet, September 2025 — Peru programme
+4. World Economic Forum, *Exploring Blockchain Technology for Government Transparency*. The Colombia programme
+5. IDB Lab, LACChain and LACNet becoming LNet, September 2025. The Peru programme
 6. OECD Digital Government Index 2025, Costa Rica at 0.45 against a 0.70 average, up from 0.22
 7. Open Government Partnership commitment CR0052, open contracting standards in SICOP
-8. Silva-Atencio and Salas-Castro, LEIRD 2025 — the paper whose figures are discussed and not used
-9. Ancla repository, `findings/2026-08-26-cross-source.md` — method and full numbers for the comparison described in section 5.2
+8. Silva-Atencio and Salas-Castro, LEIRD 2025. The paper whose figures are discussed in section 3.3 and used for nothing
+9. Ancla repository, `findings/2026-08-26-cross-source.md`. Method and full numbers for the comparison in section 5.2
 10. DecentralChain mainnet transaction `5QcP1tNimcmt3993fNmyACZ1JmZEaMoMbacUHq7VBxRG` at height 2,316,909
