@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ancla verifier</title>
+<style>
+  :root {
+    --bg: #fbfbf9; --fg: #16181d; --muted: #5c6270; --line: #dfe0dc;
+    --card: #ffffff; --ok: #0f6b3f; --bad: #a3201c; --warn: #8a5a00;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#131417; --fg:#e8e8e4; --muted:#9a9fa9; --line:#2b2d33;
+            --card:#191b1f; --ok:#5fcf94; --bad:#f0837e; --warn:#e0b45e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 60rem; margin: 0 auto; padding: 2.5rem 1.25rem 5rem; }
+  h1 { font-size: 1.6rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
+  .sub { color: var(--muted); margin: 0 0 2rem; }
+  h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em;
+       color: var(--muted); margin: 2rem 0 .6rem; font-weight: 600; }
+  textarea, input {
+    width:100%; padding:.7rem .8rem; border:1px solid var(--line); border-radius:6px;
+    background:var(--card); color:var(--fg); font-family:var(--mono); font-size:12.5px;
+  }
+  textarea { min-height: 12rem; resize: vertical; }
+  .row { display:flex; gap:.6rem; flex-wrap:wrap; margin-top:.75rem; }
+  button { padding:.6rem 1.1rem; border:1px solid var(--line); border-radius:6px;
+           background:var(--fg); color:var(--bg); font-weight:600; cursor:pointer; font-size:14px; }
+  button.secondary { background:var(--card); color:var(--fg); font-weight:500; }
+  .card { border:1px solid var(--line); border-radius:8px; background:var(--card);
+          padding:1rem 1.1rem; margin-top:1rem; }
+  .verdict { font-weight:700; font-size:1.05rem; margin-bottom:.4rem; }
+  .ok { color:var(--ok); } .bad { color:var(--bad); } .warn { color:var(--warn); }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:.3rem .9rem; margin:.9rem 0 0; font-size:13px; }
+  dt { color:var(--muted); white-space:nowrap; }
+  dd { margin:0; font-family:var(--mono); word-break:break-all; }
+  .note { color:var(--muted); font-size:13px; border-left:2px solid var(--line);
+          padding-left:.85rem; margin-top:2.5rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ancla verifier</h1>
+  <p class="sub">
+    Check a Costa Rican procurement record against a Merkle root committed to
+    DecentralChain. All verification runs in this page. Nothing is sent anywhere except
+    a read-only request to the public node.
+  </p>
+
+  <h2>Proof</h2>
+  <textarea id="proof" spellcheck="false"
+    placeholder="Paste the JSON printed by: ancla prove YYYYMM Table id"></textarea>
+
+  <h2>Anchor account (optional)</h2>
+  <input id="addr" spellcheck="false" placeholder="DecentralChain address holding the roots" />
+
+  <div class="row">
+    <button id="go">Verify</button>
+    <button id="sample" class="secondary">Load example</button>
+  </div>
+
+  <div id="result"></div>
+
+  <p class="note">
+    A passing check proves the record matches the root that was committed, and that the
+    commitment happened when the chain says it did. It does not prove the record is
+    accurate, and it says nothing about anything that happened before the first anchor.
+    Anchoring establishes integrity forward from the moment it starts.
+  </p>
+</main>
+
+<script type="module">
+const NODE = "https://mainnet-node.decentralchain.io";
+const $ = (id) => document.getElementById(id);
+const hex = (b) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+const bytes = (h) => new Uint8Array(h.match(/../g).map((x) => parseInt(x, 16)));
+
+async function sha256(...parts) {
+  let n = 0;
+  for (const p of parts) n += p.length;
+  const all = new Uint8Array(n);
+  let o = 0;
+  for (const p of parts) { all.set(p, o); o += p.length; }
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", all));
+}
+
+// RFC 6962: leaves and internal nodes are domain-separated with 0x00 / 0x01, so a
+// leaf digest can never be replayed as an internal node.
+const leafHash = (s) => sha256(new Uint8Array([0]), new TextEncoder().encode(s));
+const nodeHash = (l, r) => sha256(new Uint8Array([1]), l, r);
+
+async function recompute(p) {
+  const NUL = String.fromCharCode(0);
+  let acc = await leafHash(p.table + NUL + p.id + NUL + p.byteHash);
+  for (const step of p.proof) {
+    const sib = bytes(step.hash);
+    acc = step.side === "left" ? await nodeHash(sib, acc) : await nodeHash(acc, sib);
+  }
+  return hex(acc);
+}
+
+async function onChainRoot(addr, day, month) {
+  const key = "root_" + day + "_" + month;
+  const res = await fetch(NODE + "/addresses/data/" + addr + "/" + encodeURIComponent(key));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("node returned HTTP " + res.status);
+  return String((await res.json()).value);
+}
+
+const render = (html) => { $("result").innerHTML = html; };
+const row = (k, v) => "<dt>" + k + "</dt><dd>" + v + "</dd>";
+
+$("go").addEventListener("click", async () => {
+  let p;
+  try {
+    p = JSON.parse($("proof").value);
+  } catch {
+    return render('<div class="card"><div class="verdict bad">That is not valid JSON.</div></div>');
+  }
+  for (const f of ["table", "id", "byteHash", "proof", "merkleRoot"]) {
+    if (!(f in p)) {
+      return render('<div class="card"><div class="verdict bad">Proof is missing "' + f + '".</div></div>');
+    }
+  }
+
+  const computed = await recompute(p);
+  const consistent = computed === String(p.merkleRoot).toLowerCase();
+
+  let chain = "";
+  const addr = $("addr").value.trim();
+  if (addr && p.anchoredDay && p.month) {
+    try {
+      const published = await onChainRoot(addr, p.anchoredDay, p.month);
+      if (published === null) {
+        chain = '<div class="verdict warn">No root anchored for ' + p.anchoredDay + ".</div>";
+      } else if (published.toLowerCase() === computed) {
+        chain = '<div class="verdict ok">Matches the root anchored on ' + p.anchoredDay + ".</div>";
+      } else {
+        chain = '<div class="verdict bad">Differs from the anchored root. This record changed after it was committed.</div>';
+      }
+    } catch (e) {
+      chain = '<div class="verdict warn">Could not reach the node: ' + e.message + "</div>";
+    }
+  }
+
+  render('<div class="card"><div class="verdict ' + (consistent ? "ok" : "bad") + '">' +
+    (consistent ? "Proof is internally consistent." : "Proof does not reproduce the stated root.") +
+    "</div>" + chain + "<dl>" +
+    row("record", p.table + " " + p.id) +
+    row("record hash", p.byteHash) +
+    row("recomputed root", computed) +
+    row("stated root", p.merkleRoot) +
+    row("path length", p.proof.length + " steps over " + (p.leafCount ?? "?") + " leaves") +
+    row("canonicalizer", p.canonVersion ?? "unstated") +
+    row("source archive", p.archiveSha256 ?? "unstated") +
+    "</dl></div>");
+});
+
+$("sample").addEventListener("click", () => {
+  $("proof").value = JSON.stringify(
+    {
+      month: "202512", table: "Contratos", id: "EXAMPLE|01",
+      byteHash: "00".repeat(32), merkleRoot: "00".repeat(32),
+      leafCount: 1, canonVersion: "ancla-canon-1", proof: [],
+    },
+    null, 2,
+  );
+});
+</script>
+</body>
+</html>

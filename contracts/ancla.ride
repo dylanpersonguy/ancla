@@ -1,0 +1,60 @@
+{-# STDLIB_VERSION 6 #-}
+{-# CONTENT_TYPE DAPP #-}
+{-# SCRIPT_TYPE ACCOUNT #-}
+
+#
+# Ancla anchor account.
+#
+# Stores Merkle roots and nothing else. There is deliberately no on-chain proof
+# verification: proofs are checked client-side against the node REST API, so this
+# contract cannot be the thing that breaks.
+#
+# It is short on purpose. A Contraloria lawyer can be walked through thirty lines
+# of RIDE. Nobody is going to audit a Solidity system for a state procurement
+# platform. RIDE cannot loop and cannot be re-entered, and its execution cost is
+# known at deploy time, which is the argument that matters in that room.
+#
+# Keys, per anchored day and source month:
+#   root_<YYYY-MM-DD>_<YYYYMM>   64-char hex Merkle root
+#   meta_<YYYY-MM-DD>_<YYYYMM>   "<canonVersion>|<recordCount>|<archiveSha256>"
+#   latest                       most recent anchored day
+#
+# Roots are append-only: an existing key cannot be overwritten. If a day needs
+# correcting, anchor a new day. History is the product, and a system that can
+# rewrite its own history is the thing this exists to detect.
+#
+# Note that append-only here is enforced for calls through this dApp. The account
+# owner can still write raw DataTransactions directly, so the real guarantee comes
+# from the account being controlled by the named validator set rather than from
+# this code. Say that out loud rather than implying the contract is stronger than
+# it is.
+#
+
+let OWNER = base58'REPLACE_WITH_ANCHOR_PUBLIC_KEY'
+
+func hexLen(s: String) = size(s) == 64
+
+@Callable(i)
+func anchor(day: String, month: String, root: String, meta: String) = {
+    let rootKey = "root_" + day + "_" + month
+    let metaKey = "meta_" + day + "_" + month
+    if (i.callerPublicKey != OWNER) then
+        throw("only the anchor account may write roots")
+    else if (isDefined(getString(this, rootKey))) then
+        throw("already anchored: " + rootKey)
+    else if (!hexLen(root)) then
+        throw("root must be 64 hex characters")
+    else if (size(day) != 10) then
+        throw("day must be YYYY-MM-DD")
+    else if (size(month) != 6) then
+        throw("month must be YYYYMM")
+    else
+        [
+            StringEntry(rootKey, root),
+            StringEntry(metaKey, meta),
+            StringEntry("latest", day)
+        ]
+}
+
+@Verifier(tx)
+func verify() = sigVerify(tx.bodyBytes, tx.proofs[0], tx.senderPublicKey)

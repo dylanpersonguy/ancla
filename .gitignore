@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.DS_Store
+.env
+.env.local
+
+# The archive mirror never belongs in git. It is ~GBs and grows daily.
+# Point ANCLA_DATA at a path outside the repo. See README.
+data/
+*.zip
+
+# Internal strategy: competitive assessment, entity/governance analysis, business
+# model. Lives next to the code for the team, never published. The public design
+# and the honest limits are in README.md.
+ANCLA_PLAN.md

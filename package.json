@@ -1,0 +1,21 @@
+{
+  "name": "ancla",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public evidence layer for Costa Rican procurement records",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "survey": "node packages/ingest/src/cli.ts survey",
+    "mirror": "node packages/ingest/src/cli.ts mirror",
+    "status": "node packages/ingest/src/cli.ts status",
+    "check": "node --test packages/*/test/*.test.ts apps/*/test/*.test.ts"
+  },
+  "dependencies": {
+    "@decentralchain/transactions": "^5.0.0",
+    "@decentralchain/ts-lib-crypto": "^2.0.0"
+  }
+}

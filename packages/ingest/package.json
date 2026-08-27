@@ -1,0 +1,8 @@
+{
+  "name": "@ancla/ingest",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mirror the Observatorio de Compra Pública archives with provenance",
+  "license": "MIT"
+}

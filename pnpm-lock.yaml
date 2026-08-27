@@ -1,0 +1,142 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@decentralchain/transactions':
+        specifier: ^5.0.0
+        version: 5.0.0
+      '@decentralchain/ts-lib-crypto':
+        specifier: ^2.0.0
+        version: 2.0.0
+
+  packages/canonicalize: {}
+
+  packages/differ: {}
+
+  packages/ingest: {}
+
+  packages/merkle: {}
+
+packages:
+
+  '@decentralchain/bignumber@1.1.1':
+    resolution: {integrity: sha512-um0i/QjgPNZ3G4wtiwuph+eUp1N13ayt9sO3CrEceze4fNoW9RnDGPTlfP45KG4cTFiUbJt2ZrCmYJz+UQlAVQ==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/marshall@1.0.0':
+    resolution: {integrity: sha512-jwttm1s64DUQgC2RWCypcn3M6fA9ksZUCnKDT/p8XfyeOC0DcF0/pofSWKrvv2VBfojQT7XMj1N/80MNQlgSPg==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/node-api-js@2.0.0':
+    resolution: {integrity: sha512-GgeXtz0qcvBMO/BWlKR7lld7xYWSLiBjC0xpHuTCjvGSFnImUhCX+iwzSa+x/7ce3wv+LiVYzvxNMpU1faiGCw==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/protobuf-serialization@2.0.0':
+    resolution: {integrity: sha512-tRvfjcXcGoinrWHA5bjGM+jRSYHZiDu+F6coN+fRIKVweRGe1cIwxkQaY5hsraMct7Bzpf+sPMRAnk2m3tF95g==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/transactions@5.0.0':
+    resolution: {integrity: sha512-yLFXoJRDWSmO3u7z8aji97mgRLWdmsamUIbwa0vBfRFpvvz+afJmHvU9eeiq4sSIhWaeV2rL+yeM+pI0QyC2cA==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/ts-lib-crypto@2.0.0':
+    resolution: {integrity: sha512-JA+U53hX3Og8VWlvVgmpoggRs4T1EGjqlN/XuXgL+pAMVFJY2D6/neY7mAgWvbzZpKzeCLfXVZlql5TQ3JgFtA==}
+    engines: {node: '>=24'}
+
+  '@decentralchain/ts-types@2.0.0':
+    resolution: {integrity: sha512-96ZKrsjcbc+FQ4n+e1+KgRP5QYA+8+AAVC5/AykyY6WspxGuZz69wwrHT8TVAPYqIsePxkJeUeaxclEZyyzH3Q==}
+    engines: {node: '>=24'}
+
+  '@noble/ciphers@2.1.1':
+    resolution: {integrity: sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/curves@2.3.0':
+    resolution: {integrity: sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.3.0':
+    resolution: {integrity: sha512-oN+QwyX7VSHotibwubG3kpzbwKrfnyR6OOO+3Nk/53ADL7FmgHHz4TgrbaYKvvOw09u6QTx0oiH1cNCIOuN0CQ==}
+    engines: {node: '>= 20.19.0'}
+
+  base64-js@1.5.1:
+    resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
+
+  bignumber.js@10.0.2:
+    resolution: {integrity: sha512-E8Wp9O06QA6lneJ4aRUXKYf/1GIomqUEmUMwtIOMtDxf1U52ffJY+y7JBk/8wRafA8qOIqLnXQGqonYXZdBnFQ==}
+
+  long@5.3.2:
+    resolution: {integrity: sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==}
+
+  protobufjs@8.8.0:
+    resolution: {integrity: sha512-N3xhQ5yyBx3vQq4gubBfASzYhJGNzeDbjqBpu61g7UVylsN/qyffU96TKWD3GbbLOKF82VGNRNvv1+BFgE31Eg==}
+    engines: {node: '>=12.0.0'}
+
+  typed-ts-events@3.0.1:
+    resolution: {integrity: sha512-WYdfmLgs0CA3yFkzu7CfKBKAftMzol2eONV6RzAehdVmiMTWojdC5IZqkolUWWZhkABqCxvLuV4QDEVAYs484w==}
+
+snapshots:
+
+  '@decentralchain/bignumber@1.1.1':
+    dependencies:
+      bignumber.js: 10.0.2
+
+  '@decentralchain/marshall@1.0.0':
+    dependencies:
+      base64-js: 1.5.1
+      long: 5.3.2
+
+  '@decentralchain/node-api-js@2.0.0':
+    dependencies:
+      '@decentralchain/bignumber': 1.1.1
+      '@decentralchain/ts-lib-crypto': 2.0.0
+      '@decentralchain/ts-types': 2.0.0
+      typed-ts-events: 3.0.1
+
+  '@decentralchain/protobuf-serialization@2.0.0':
+    dependencies:
+      long: 5.3.2
+      protobufjs: 8.8.0
+
+  '@decentralchain/transactions@5.0.0':
+    dependencies:
+      '@decentralchain/marshall': 1.0.0
+      '@decentralchain/node-api-js': 2.0.0
+      '@decentralchain/protobuf-serialization': 2.0.0
+      '@decentralchain/ts-lib-crypto': 2.0.0
+      '@decentralchain/ts-types': 2.0.0
+      long: 5.3.2
+
+  '@decentralchain/ts-lib-crypto@2.0.0':
+    dependencies:
+      '@noble/ciphers': 2.1.1
+      '@noble/curves': 2.3.0
+      '@noble/hashes': 2.3.0
+
+  '@decentralchain/ts-types@2.0.0': {}
+
+  '@noble/ciphers@2.1.1': {}
+
+  '@noble/curves@2.3.0':
+    dependencies:
+      '@noble/hashes': 2.3.0
+
+  '@noble/hashes@2.3.0': {}
+
+  base64-js@1.5.1: {}
+
+  bignumber.js@10.0.2: {}
+
+  long@5.3.2: {}
+
+  protobufjs@8.8.0:
+    dependencies:
+      long: 5.3.2
+
+  typed-ts-events@3.0.1: {}
