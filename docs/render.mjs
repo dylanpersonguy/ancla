@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
 import { marked } from 'marked';
 
-const [, , mdPath, titleArg, subtitleArg] = process.argv;
+const [, , mdPath, titleArg, subtitleArg, langArg] = process.argv;
 if (!mdPath) {
   process.stderr.write('usage: node docs/render.mjs <file.md> [title] [subtitle]\n');
   process.exit(1);
@@ -22,7 +22,27 @@ if (!mdPath) {
 
 const TITLE = titleArg ?? 'Ancla';
 const SUBTITLE = subtitleArg ?? '';
-const DATE = '27 August 2026';
+const LANG = langArg === 'es' ? 'es' : 'en';
+const COPY = {
+  en: {
+    date: '27 August 2026',
+    tag:
+      'Live on DecentralChain mainnet. 189 monthly archives mirrored, 112,561,695 ' +
+      'records fingerprinted, first root committed 27 August 2026 at block 2,316,909.',
+    root: 'root',
+    height: 'height',
+  },
+  es: {
+    date: '27 de agosto de 2026',
+    tag:
+      'Activa en la red principal de DecentralChain. 189 archivos mensuales ' +
+      'replicados, 112.561.695 registros sellados, primera raíz inscrita el 27 de ' +
+      'agosto de 2026 en el bloque 2.316.909.',
+    root: 'raíz',
+    height: 'altura',
+  },
+}[LANG];
+const DATE = COPY.date;
 const VERSION = 'v1.0';
 
 const raw = readFileSync(resolve(mdPath), 'utf8');
@@ -149,21 +169,18 @@ a{color:var(--indigo);text-decoration:none;}
 h2,h3{page-break-after:avoid;}
 `;
 
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${TITLE}</title>
+const html = `<!doctype html><html lang="${LANG}"><head><meta charset="utf-8"><title>${TITLE}</title>
 <style>${CSS}</style></head><body>
 <section class="cover">
   <div class="wordmark">DecentralAmerica</div>
   <h1>${TITLE}</h1>
   <div class="sub">${SUBTITLE}</div>
   <div class="rule-grad"></div>
-  <div class="tag">
-    A public evidence layer for Costa Rican procurement records. Live on
-    DecentralChain mainnet since 27 August 2026.
-  </div>
+  <div class="tag">${COPY.tag}</div>
   <div class="byline">
     ${VERSION} &nbsp;·&nbsp; ${DATE}<br>
     DecentralAmerica &nbsp;·&nbsp; decentralchain.io<br>
-    root 4a58b302bf5f1311 &nbsp;·&nbsp; height 2,316,909
+    ${COPY.root} 4a58b302bf5f1311 &nbsp;·&nbsp; ${COPY.height} 2.316.909
   </div>
 </section>
 <main>

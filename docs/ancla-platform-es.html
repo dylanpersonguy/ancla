@@ -1,0 +1,731 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Ancla</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --paper:#FAF9F6; --sink:#F2F0EA; --ink:#141414; --muted:#5A5A5A;
+  --rule:#E4E1D9; --indigo:#3A2CB7; --cyan:#28C8F0;
+  --pos:#16A34A; --neg:#DC2626; --warn:#D97706;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+@page{size:A4;margin:20mm 18mm 16mm;}
+@page:first{margin:0;}
+html{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+body{
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  font-size:10pt;line-height:1.68;color:var(--ink);background:var(--paper);
+}
+
+/* cover */
+.cover{
+  height:297mm;padding:38mm 24mm 24mm;display:flex;flex-direction:column;
+  page-break-after:always;background:var(--paper);
+}
+.wordmark{
+  font-family:'IBM Plex Mono',monospace;font-size:9pt;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--indigo);
+}
+.cover h1{
+  font-size:40pt;font-weight:600;letter-spacing:-.02em;line-height:1.04;
+  margin-top:12mm;
+}
+.cover .sub{font-size:14pt;color:var(--muted);margin-top:6mm;max-width:120mm;line-height:1.45;}
+.rule-grad{height:3px;width:56mm;margin-top:10mm;
+  background:linear-gradient(90deg,var(--indigo),var(--cyan));}
+.byline{
+  font-family:'IBM Plex Mono',monospace;font-size:8.5pt;color:var(--muted);
+  margin-top:auto;line-height:1.9;
+}
+.cover .tag{
+  margin-top:14mm;padding:6mm 7mm;background:var(--sink);
+  border-left:3px solid var(--indigo);font-size:10.5pt;line-height:1.6;max-width:130mm;
+}
+
+/* abstract */
+.abstract{
+  padding:5mm 6mm;background:var(--sink);border-left:3px solid var(--indigo);
+  margin-bottom:9mm;font-size:10pt;line-height:1.7;
+}
+.abstract p{margin:0;}
+.abstract code{background:transparent;padding:0;font-size:8.6pt;}
+
+/* headings */
+h2{
+  font-size:17pt;font-weight:600;letter-spacing:-.01em;margin:11mm 0 4mm;
+  padding-bottom:2.5mm;border-bottom:1px solid var(--rule);
+}
+h2.brk{page-break-before:always;margin-top:0;}
+h3{font-size:11.5pt;font-weight:600;margin:7mm 0 2.5mm;}
+h2 .n,h3 .n{
+  font-family:'IBM Plex Mono',monospace;color:var(--indigo);font-weight:500;
+  margin-right:3.5mm;
+}
+h2 .n{font-size:14pt;} h3 .n{font-size:10pt;}
+h2+p,h3+p{margin-top:0;}
+
+p{margin:0 0 3.2mm;}
+strong{font-weight:600;}
+em{font-style:italic;color:var(--ink);}
+
+ul,ol{margin:0 0 3.5mm 5mm;}
+li{margin-bottom:1.6mm;padding-left:1mm;}
+li::marker{color:var(--indigo);}
+
+/* code */
+code{
+  font-family:'IBM Plex Mono',monospace;font-size:8.4pt;
+  background:var(--sink);padding:.4mm 1.1mm;border-radius:2px;word-break:break-all;
+}
+pre{
+  background:var(--sink);border-left:2px solid var(--rule);
+  padding:4mm 5mm;margin:0 0 4mm;overflow:hidden;page-break-inside:avoid;
+}
+pre code{background:transparent;padding:0;font-size:8.2pt;line-height:1.62;word-break:normal;}
+
+/* tables */
+table{
+  width:100%;border-collapse:collapse;margin:0 0 5mm;font-size:8.8pt;
+  page-break-inside:avoid;
+}
+thead th{
+  text-align:left;font-family:'IBM Plex Mono',monospace;font-size:7.6pt;
+  font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1.5px solid var(--ink);padding:2.2mm 2.5mm;
+}
+tbody td{border-bottom:1px solid var(--rule);padding:2.2mm 2.5mm;vertical-align:top;}
+tbody tr:nth-child(even){background:rgba(242,240,234,.55);}
+tbody td:nth-child(n+2){font-variant-numeric:tabular-nums;}
+table code{font-size:7.8pt;}
+
+blockquote{
+  border-left:3px solid var(--indigo);padding:3mm 5mm;margin:0 0 4mm;
+  background:var(--sink);color:var(--ink);
+}
+hr{border:none;border-top:1px solid var(--rule);margin:7mm 0;}
+a{color:var(--indigo);text-decoration:none;}
+h2,h3{page-break-after:avoid;}
+</style></head><body>
+<section class="cover">
+  <div class="wordmark">DecentralAmerica</div>
+  <h1>Ancla</h1>
+  <div class="sub">Capa pública de evidencia para la contratación pública costarricense, y los productos construidos sobre ella.</div>
+  <div class="rule-grad"></div>
+  <div class="tag">Activa en la red principal de DecentralChain. 189 archivos mensuales replicados, 112.561.695 registros sellados, primera raíz inscrita el 27 de agosto de 2026 en el bloque 2.316.909.</div>
+  <div class="byline">
+    v1.0 &nbsp;·&nbsp; 27 de agosto de 2026<br>
+    DecentralAmerica &nbsp;·&nbsp; decentralchain.io<br>
+    raíz 4a58b302bf5f1311 &nbsp;·&nbsp; altura 2.316.909
+  </div>
+</section>
+<main>
+<div class="abstract"><p>Costa Rica publica su registro nacional de contratación pública como datos abiertos, actualizado a diario. Ese registro publicado se reescribe después de haberse publicado, y hasta agosto de 2026 nadie guardaba una copia de lo que decía antes. Ancla es una plataforma en funcionamiento, activa en la red principal de DecentralChain, que hace tres cosas. Toma una huella digital diaria de todo el registro y la inscribe en una cadena de bloques pública, de modo que cualquier alteración posterior queda demostrable por cualquier persona. Une 189 archivos mensuales en el primer historial consultable completo de la contratación pública costarricense, de 2010 a 2026. Y ejecuta análisis de integridad sobre ese historial, que ya estableció que <strong>el 41,1% de los procedimientos públicos costarricenses recibe una sola oferta</strong>. La plataforma no requiere permiso de ninguna institución, no coloca información sensible en la cadena de bloques y cuesta menos de un dólar al año operarla. Este documento explica qué es, cómo funciona, por qué DecentralChain y no otra cadena, qué se puede vender sobre ella y cuánto vale.</p>
+</div>
+<h2><span class="n">1</span>Cómo leer este documento</h2>
+<p>Las secciones 2 a 6 explican la plataforma: el problema, qué se construyó, cómo funciona y por qué importa la elección de la cadena de bloques. Las secciones 7 a 10 cubren la parte comercial: productos, mercado, defensibilidad y economía. Las secciones 11 y 12 exponen los riesgos y el estado actual sin suavizar ninguno de los dos.</p>
+<p>Cada cifra aquí fue medida, no estimada, salvo donde una sección diga lo contrario. La sección 13 indica cómo reproducirlas usted mismo.</p>
+<h2 class="brk"><span class="n">2</span>El problema</h2>
+<h3><span class="n">2.1</span>Los datos ya son públicos, y ese no es el problema</h3>
+<p>Costa Rica opera SICOP, el Sistema Integrado de Compras Públicas, administrado por RACSA para el Ministerio de Hacienda. La Ley 9395 lo hizo obligatorio para la contratación pública. El Observatorio de Compra Pública republica los datos de SICOP de forma masiva, en archivos mensuales de CSV, actualizados a diario, desde diciembre de 2010.</p>
+<p>Estos son buenos datos abiertos bajo cualquier criterio. Gratuitos, sin registro, con licencia explícita de reutilización. Un solo comando descarga quince años de historia de contratación nacional.</p>
+<table>
+<thead>
+<tr>
+<th>Propiedad</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Archivos mensuales</td>
+<td>189</td>
+</tr>
+<tr>
+<td>Cobertura</td>
+<td>diciembre 2010 a agosto 2026</td>
+</tr>
+<tr>
+<td>Tamaño comprimido</td>
+<td>3,04 GB</td>
+</tr>
+<tr>
+<td>Tablas por archivo</td>
+<td>25</td>
+</tr>
+<tr>
+<td>Registros en todos los archivos</td>
+<td>112.561.695</td>
+</tr>
+<tr>
+<td>Actualización</td>
+<td>diaria, alrededor de las 13:00 UTC</td>
+</tr>
+</tbody></table>
+<h3><span class="n">2.2</span>El registro publicado cambia después de publicarse</h3>
+<p>Un archivo debería dejar de cambiar una vez terminado su mes. Muchos no lo hacen.</p>
+<p>Al comparar la fecha de última modificación de cada archivo contra el cierre de su propio mes, y agrupar por el día en que ocurrió el cambio, aparecen nueve eventos de republicación.</p>
+<table>
+<thead>
+<tr>
+<th>Fecha</th>
+<th>Meses reescritos</th>
+<th>Rango</th>
+<th>Tamaño</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2022-12-06</td>
+<td>106</td>
+<td>201012–201910</td>
+<td>566,8 MB</td>
+</tr>
+<tr>
+<td>2022-12-07</td>
+<td>26</td>
+<td>201911–202112</td>
+<td>597,7 MB</td>
+</tr>
+<tr>
+<td>2022-12-08</td>
+<td>11</td>
+<td>202201–202211</td>
+<td>422,5 MB</td>
+</tr>
+<tr>
+<td>2022-12-09</td>
+<td>1</td>
+<td>201212</td>
+<td>3,0 MB</td>
+</tr>
+<tr>
+<td><strong>2024-09-20</strong></td>
+<td><strong>7</strong></td>
+<td><strong>202401–202408</strong></td>
+<td><strong>144,5 MB</strong></td>
+</tr>
+<tr>
+<td><strong>2024-10-03</strong></td>
+<td><strong>1</strong></td>
+<td><strong>202407</strong></td>
+<td><strong>13,8 MB</strong></td>
+</tr>
+<tr>
+<td><strong>2024-10-04</strong></td>
+<td><strong>1</strong></td>
+<td><strong>202409</strong></td>
+<td><strong>51,1 MB</strong></td>
+</tr>
+<tr>
+<td><strong>2025-05-06</strong></td>
+<td><strong>3</strong></td>
+<td><strong>202502–202504</strong></td>
+<td><strong>105,2 MB</strong></td>
+</tr>
+<tr>
+<td><strong>2026-08-10</strong></td>
+<td><strong>2</strong></td>
+<td><strong>202606–202607</strong></td>
+<td><strong>105,7 MB</strong></td>
+</tr>
+</tbody></table>
+<p>El grupo de diciembre de 2022 es la carga original que construyó el archivo histórico. Déjelo de lado.</p>
+<p>Los cinco eventos posteriores son el hallazgo: <strong>14 archivos de meses ya cerrados fueron revisados entre 2024 y 2026</strong>, ninguno dentro de la ventana diaria normal, ninguno acompañado de declaración pública alguna sobre qué cambió. Julio de 2024 fue reescrito dos veces, con seis semanas de diferencia.</p>
+<p>Un detalle forense respalda esta lectura. Los archivos reescritos el 20 de setiembre de 2024 guardan sus CSV dentro de una carpeta interna del zip; todos los demás los guardan en el nivel superior. Esos archivos fueron reexportados por una herramienta distinta, no corregidos en su lugar.</p>
+<h3><span class="n">2.3</span>Nadie guardó una línea base, y ese sí es el problema</h3>
+<p>Nada de esto es necesariamente indebido. Parte será recarga rutinaria y algunas correcciones son legítimas. Precisamente ahí está la dificultad: <strong>no hay forma de saberlo</strong>, porque no existe registro de lo que esos archivos decían antes.</p>
+<p>Lo verificamos a fondo. El Internet Archive no tiene ninguna captura de estos archivos. Ninguna universidad, medio de comunicación ni institución ha publicado un espejo histórico. La fecha de última modificación era la única evidencia de que algo ocurrió, y no dice nada sobre qué.</p>
+<p>La brecha no es el secretismo. Los datos se publican. La brecha es que la versión publicada es la única versión, y es modificable.</p>
+<h2 class="brk"><span class="n">3</span>Qué construimos</h2>
+<p>Tres capas. Suelen confundirse y tienen valores muy distintos.</p>
+<p><strong>Capa uno, la capa de evidencia.</strong> Cada día se descarga todo el registro publicado, se reduce cada registro a una huella digital, se combinan todas en un único valor de 64 caracteres y ese valor se escribe en DecentralChain. Cualquier alteración posterior a cualquier registro rompe la coincidencia, de forma demostrable, contra un sello de tiempo que nadie controla.</p>
+<p><strong>Capa dos, el índice longitudinal.</strong> Los 189 archivos unidos en una sola base de datos consultable. El Observatorio publica fragmentos mensuales, así que un procedimiento abierto en marzo y pagado en noviembre no aparece completo en ningún archivo. Esta capa es el historial ensamblado.</p>
+<table>
+<thead>
+<tr>
+<th>Tabla</th>
+<th>Filas</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Ofertas</td>
+<td>2.054.508</td>
+</tr>
+<tr>
+<td>Fechas por etapa</td>
+<td>1.526.153</td>
+</tr>
+<tr>
+<td>Líneas ofertadas</td>
+<td>1.137.187</td>
+</tr>
+<tr>
+<td>Líneas adjudicadas</td>
+<td>378.729</td>
+</tr>
+<tr>
+<td>Contratos</td>
+<td>373.051</td>
+</tr>
+<tr>
+<td>Carteles</td>
+<td>288.454</td>
+</tr>
+<tr>
+<td>Recursos de objeción</td>
+<td>120.752</td>
+</tr>
+<tr>
+<td>Actores resueltos</td>
+<td>72.105</td>
+</tr>
+</tbody></table>
+<p><strong>Capa tres, la capa de análisis.</strong> Métricas de competencia, estadísticas de duración, comparación de precios, tamizajes de posible colusión y comparación entre instituciones, todo calculado sobre el historial completo.</p>
+<p>Sobre estas capas operan una API REST, una exportación en formato OCDS, un motor de alertas, una aplicación web en español y un verificador público que comprueba pruebas en el navegador del propio lector.</p>
+<p>La plataforma completa son 13.021 líneas de código en diez paquetes, con 5.621 líneas de pruebas y 306 pruebas automatizadas aprobadas. No tiene dependencias externas en tiempo de ejecución. Ese último punto es deliberado: un sistema cuyo valor depende de producir resultados idénticos dentro de varios años no debería apoyarse en un árbol de dependencias que puede moverse por debajo.</p>
+<h2 class="brk"><span class="n">4</span>Cómo funciona</h2>
+<pre><code>  Archivos del Observatorio          diarios, públicos, sin autenticación
+            |
+   1. ingesta                        descargar, sellar, conservar siempre
+            |
+   2. canonicalización               reducir cada registro a dos huellas
+            |
+   3. combinación                    unir ~1,4 millones en una sola raíz
+            |
+   4. anclaje                        escribir la raíz en DecentralChain
+            |
+   5. índice                         unir todos los meses en un historial
+            |
+   6. análisis                       competencia, duración, precio, colusión
+            |
+   7. entrega                        API, alertas, web, verificador
+</code></pre>
+<h3><span class="n">4.1</span>La ingesta conserva todo y no sobrescribe nada</h3>
+<p>Cada archivo se guarda con un nombre construido a partir de su fecha de publicación y de la huella de su propio contenido. Cuando un mes se reescribe, la nueva versión queda junto a la anterior. La carpeta de un mes se convierte en su propio historial de revisiones.</p>
+<p>Esta es la parte con un plazo real. Cada día que el sistema no corre es un día de historia que nadie puede recuperar.</p>
+<h3><span class="n">4.2</span>La canonicalización produce dos huellas, no una</h3>
+<p>Cada registro se reduce a una identidad estable y dos huellas distintas.</p>
+<table>
+<thead>
+<tr>
+<th>Huella</th>
+<th>Cubre</th>
+<th>Responde</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Huella de bytes</td>
+<td>cada campo tal como se publicó</td>
+<td>¿cambió algo, lo que sea?</td>
+</tr>
+<tr>
+<td>Huella de valor</td>
+<td>números normalizados, marcas de tiempo excluidas</td>
+<td>¿cambió un <em>valor</em>?</td>
+</tr>
+</tbody></table>
+<p>La distinción sostiene todo lo demás. Un precio publicado como <code>1.000</code> y republicado como <code>1</code> es el mismo precio impreso distinto. Un sistema con una sola huella llama a eso alteración, entierra su propia salida en falsas alarmas y termina ignorado.</p>
+<p>Esto no es teórico. Durante el desarrollo, una comparación entre dos fuentes de datos reportó 40.845 discrepancias. Todas eran artefactos del código de comparación. El diseño de dos huellas es la respuesta directa, y la falla está documentada en el repositorio en lugar de ocultada.</p>
+<p>Las reglas de canonicalización están congeladas y llevan número de versión. Cambiarlas sin cambiar la versión invalidaría en silencio todo compromiso hecho antes, que es la única falla que este sistema no puede sobrevivir.</p>
+<h3><span class="n">4.3</span>La combinación produce un valor para todo el mes</h3>
+<p>Las huellas de los registros se ordenan y se combinan en una sola raíz, usando la misma construcción que sostiene los registros públicos con los que los navegadores detectan certificados falsificados de sitios web.</p>
+<p>La propiedad útil: demostrar que un registro pertenece a un conjunto de 300.000 requiere unos 19 valores cortos, no el conjunto completo. Un proveedor puede demostrar que su contrato estaba en el registro publicado sin manejar un archivo de 40 MB.</p>
+<h3><span class="n">4.4</span>El índice hace que el historial pueda responder</h3>
+<p>Esta capa no estaba en el plan original y resultó importar enormemente.</p>
+<p>Medir el tiempo entre publicación y notificación del contrato dentro de un solo archivo mensual da 652 observaciones y una media de 11 días. Medirlo sobre el historial unido da <strong>32.647 observaciones y una media de 43 días</strong>. De esos enlaces, 26.738 cruzan un límite de mes y no existen en ningún archivo individual.</p>
+<p>Cincuenta veces más observaciones, y la respuesta casi se cuadruplica. Cualquier análisis construido sobre un mes a la vez está equivocado, y hasta ahora un mes a la vez era todo lo que había.</p>
+<h3><span class="n">4.5</span>Dos trampas en los datos de origen</h3>
+<p>Ambas habrían corrompido todo en silencio.</p>
+<p><strong>El orden de las columnas no es estable.</strong> Entre agosto y setiembre de 2025, la séptima columna de la tabla de líneas adjudicadas pasó de acarreos a cantidad adjudicada, sin cambio de nombre. Un lector que confía en la posición de la columna carga acarreos como cantidades durante un año y nunca produce un error. Ahora todo se resuelve por nombre de columna.</p>
+<p><strong>Algunas columnas de fecha no tienen separadores.</strong> Llegan como ocho dígitos. El orden día primero se estableció midiendo sobre todo el espejo, no suponiendo: el primer par llega a 31 y el segundo nunca supera 12.</p>
+<h2 class="brk"><span class="n">5</span>Por qué una cadena de bloques</h2>
+<p>Una objeción justa, y merece respuesta directa en lugar de un supuesto.</p>
+<p>La alternativa obvia es una base de datos firmada. Guardamos los registros, los firmamos y publicamos las firmas. Eso falla por una razón: <strong>la firma vale solo lo que valga la confianza en quien tiene la llave, y el archivo completo puede reemplazarse en silencio.</strong> Si somos nosotros quienes respondemos por nuestro propio archivo, el lector tiene que confiar en nosotros, y el propósito entero es construir evidencia que no requiera confiar en nadie.</p>
+<p>Lo que aporta una cadena pública es concreto y limitado:</p>
+<ul>
+<li>Un sello de tiempo que ninguna parte puede mover por su cuenta.</li>
+<li>Replicación entre operadores independientes, de modo que el registro no pueda retirarse discretamente.</li>
+<li>Lectura pública, para que la verificación no pase por nosotros.</li>
+</ul>
+<p>Eso es todo para lo que la usamos. Sin token, sin cómputo en cadena, sin mecanismo financiero.</p>
+<h3><span class="n">5.1</span>Por qué no un libro mayor permisionado</h3>
+<p>Un artículo académico de 2025 propuso exactamente esto para Costa Rica usando Hyperledger Fabric. El sistema en producción de Perú usa una red permisionada. El diseño tiene una falla que ninguna ingeniería corrige: <strong>un libro mayor operado por la institución auditada no es un testigo independiente.</strong> Si el Ministerio opera los nodos, el Ministerio puede reescribir el libro mayor.</p>
+<p>El antecedente regional es instructivo.</p>
+<table>
+<thead>
+<tr>
+<th>Programa</th>
+<th>Enfoque</th>
+<th>Resultado</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Colombia (WEF, BID, Procuraduría)</td>
+<td>prueba de concepto permisionada</td>
+<td>no pasó del piloto</td>
+</tr>
+<tr>
+<td>Aragón, España</td>
+<td>piloto permisionado</td>
+<td>no pasó del piloto</td>
+</tr>
+<tr>
+<td>Perú (sobre LACChain)</td>
+<td>permisionada, respaldada por el BID</td>
+<td>llegó a producción</td>
+</tr>
+</tbody></table>
+<p>El sistema de Perú funciona y es lo más parecido a un competidor. Pero ancla desde dentro del propio flujo de escritura del sistema de contratación. La parte que crea el registro también inscribe la huella, así que alguien desde adentro que edite un registro inscribe la versión editada. Ancla observa desde afuera y no se integra con nada, de modo que el observador es independiente de quien escribe.</p>
+<h3><span class="n">5.2</span>Por qué DecentralChain y no Bitcoin o Ethereum</h3>
+<table>
+<thead>
+<tr>
+<th>Requisito</th>
+<th>Bitcoin</th>
+<th>Ethereum</th>
+<th>Permisionada</th>
+<th>DecentralChain</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Independiente de la parte auditada</td>
+<td>sí</td>
+<td>sí</td>
+<td><strong>no</strong></td>
+<td>sí</td>
+</tr>
+<tr>
+<td>Costo predecible y casi nulo</td>
+<td>parcial</td>
+<td><strong>no</strong></td>
+<td>sí</td>
+<td>sí</td>
+</tr>
+<tr>
+<td>Estado consultable con nombre</td>
+<td><strong>no</strong></td>
+<td>sí</td>
+<td>sí</td>
+<td>sí</td>
+</tr>
+<tr>
+<td>Contrato auditable por un abogado</td>
+<td>n/a</td>
+<td><strong>no</strong></td>
+<td>variable</td>
+<td>sí</td>
+</tr>
+<tr>
+<td>Jurisdicción costarricense</td>
+<td>no</td>
+<td>no</td>
+<td>variable</td>
+<td><strong>sí</strong></td>
+</tr>
+<tr>
+<td>Conjunto de validadores nombrable</td>
+<td>no</td>
+<td>no</td>
+<td>sí</td>
+<td><strong>sí</strong></td>
+</tr>
+</tbody></table>
+<p><strong>Bitcoin</strong> da un sello de tiempo excelente y nada más. No hay estado consultable, ni identidad institucional, ni forma de preguntar qué raíz se inscribió para junio de 2026. Aun así recomendamos usarlo como respaldo secundario gratuito, y la sección 11 lo cubre.</p>
+<p><strong>Ethereum</strong> tiene comisiones volátiles fijadas por subasta. Anclar 379 entradas durante un período congestionado podría costar cientos de dólares, y un servicio público de integridad no puede tener un costo operativo impredecible. Más práctico aún: introducir Ethereum en una conversación de gobierno convierte la conversación en una sobre tokens y especulación, lo cual es fatal en esa sala.</p>
+<p><strong>DecentralChain</strong> encaja con los requisitos específicos:</p>
+<ul>
+<li><strong>El costo es fijo y trivial.</strong> Un anclaje cuesta 0,001 DCC. Un año de anclaje diario cuesta alrededor de 0,37 DCC. No hay subasta de comisiones.</li>
+<li><strong>DataTransaction es una primitiva nativa</strong> para exactamente esta forma de dato: entradas con nombre de tipo clave y valor, hasta 100 por transacción, 150 KB. Guardar una raíz no requiere contrato inteligente alguno.</li>
+<li><strong>RIDE, el lenguaje de contratos, no es Turing completo.</strong> Un contrato demostrablemente no puede iterar, no puede reentrarse, y su costo de ejecución se conoce al momento de desplegarlo. El contrato de Ancla tiene unas treinta líneas. Un abogado de la Contraloría puede recorrerlo completo. Nadie va a auditar un contrato de mil líneas en representación de un sistema estatal de contratación, y ese no es un punto menor.</li>
+<li><strong>Domicilio costarricense.</strong> Para una institución costarricense, que la cadena tenga jurisdicción, un operador identificable y sede legal local es un argumento que una cadena global sin permisos no puede ofrecer.</li>
+<li><strong>El conjunto de validadores puede nombrarse.</strong> Esta es la parte que más importa políticamente y se cubre en la sección 11. Instituciones sin interés económico en los resultados de la contratación pueden verse operando la red.</li>
+</ul>
+<p>Prepárese para la pregunta obvia, porque un evaluador técnico la hace primero: <em>si están anclando a Bitcoin como respaldo, ¿para qué necesitan su propia cadena?</em> La respuesta es que Bitcoin da un sello de tiempo y nada más. DecentralChain da estado consultable, identidad institucional y jurisdicción. Las dos juntas dan más que cualquiera por separado.</p>
+<h3><span class="n">5.3</span>Qué se inscribe realmente en la cadena</h3>
+<p>Una transacción. Tres entradas.</p>
+<pre><code>root_2026-08-27_202512 = 4a58b302bf5f1311b2d90526d5b8ad0535fac14d688045e98dda7bb965001198
+meta_2026-08-27_202512 = ancla-canon-1|301189|ce92277ce996f610...
+latest                 = 2026-08-27
+</code></pre>
+<p>Sin documentos, sin nombres, sin montos. Una huella de 64 caracteres, un conteo de registros y una fecha. La cadena nunca ve datos de contratación, lo cual mantiene todo el diseño al margen de la ley costarricense de protección de datos de una forma que almacenar documentos no lograría.</p>
+<h2 class="brk"><span class="n">6</span>Prueba de que funciona</h2>
+<p>Esto no es un prototipo. Lo siguiente ocurrió.</p>
+<table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Red</td>
+<td>red principal de DecentralChain</td>
+</tr>
+<tr>
+<td>Cuenta de anclaje</td>
+<td><code>3DTwG5ZydbJDuLdEmwfgDEH3NuwDrgwQFtF</code></td>
+</tr>
+<tr>
+<td>Primera transacción de anclaje</td>
+<td><code>5QcP1tNimcmt3993fNmyACZ1JmZEaMoMbacUHq7VBxRG</code></td>
+</tr>
+<tr>
+<td>Altura de bloque</td>
+<td>2.316.909</td>
+</tr>
+<tr>
+<td>Fecha</td>
+<td>27 de agosto de 2026</td>
+</tr>
+<tr>
+<td>Registro anclado</td>
+<td>diciembre 2025, 301.189 registros</td>
+</tr>
+<tr>
+<td>Costo</td>
+<td>0,001 DCC</td>
+</tr>
+</tbody></table>
+<p>Un contrato específico, <code>CE201907001175|01</code>, produce una prueba de 19 pasos sobre 301.189 registros que reproduce la raíz obtenida de forma independiente desde un nodo público. El verificador hace esa aritmética en el navegador del lector y no contacta nada salvo el nodo público de la cadena.</p>
+<p>Cualquiera puede repetir esto hoy sin nuestra colaboración.</p>
+<h2 class="brk"><span class="n">7</span>Qué muestran ya los datos</h2>
+<p>El índice existe para que se le hagan preguntas. Ya respondió una que importa.</p>
+<h3><span class="n">7.1</span>Competencia</h3>
+<p><strong>El 41,1% de los procedimientos públicos costarricenses que reciben alguna oferta recibe exactamente una.</strong> Son 106.190 de 258.420 procedimientos. La tasa de oferente único es el principal indicador de alerta que usan la OCDE y el Banco Mundial para examinar sistemas de contratación.</p>
+<table>
+<thead>
+<tr>
+<th>Año</th>
+<th>Procedimientos</th>
+<th>Oferente único</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>2015</td>
+<td>2.485</td>
+<td>27,4%</td>
+</tr>
+<tr>
+<td>2018</td>
+<td>12.497</td>
+<td>41,1%</td>
+</tr>
+<tr>
+<td>2022</td>
+<td>38.190</td>
+<td>43,3%</td>
+</tr>
+<tr>
+<td>2025</td>
+<td>25.975</td>
+<td>42,5%</td>
+</tr>
+<tr>
+<td>2026 (parcial)</td>
+<td>15.681</td>
+<td>43,2%</td>
+</tr>
+</tbody></table>
+<p>La tasa subió con fuerza entre 2015 y 2018 y se mantiene estable entre 42 y 43% desde entonces. Esta cifra es conservadora por una razón técnica: los miembros de un consorcio oferente hoy cuentan como oferentes separados, de modo que resolverlos empujará la tasa hacia arriba, no hacia abajo.</p>
+<h3><span class="n">7.2</span>Excepciones a la competencia</h3>
+<p>En diciembre de 2025, el 18,7% de los carteles publicados se tramitó bajo alguna excepción al concurso abierto. Las justificaciones principales fueron reparaciones indeterminadas, proveedor único y contratación por emergencia.</p>
+<p>Una advertencia que un analista descuidado interpretaría muy mal. La tasa bruta de excepciones parece caer de 82,4% a 20,6% al inicio de diciembre de 2022, lo cual se lee como un desplome de la contratación sin concurso. No lo es. La Ley 9986 dejó de clasificar la contratación directa de escasa cuantía como excepción en esa fecha. Excluyendo esa categoría, la tasa pasa de 22,1% a 20,6%. No cambió nada salvo la ley.</p>
+<h3><span class="n">7.3</span>Recursos de objeción</h3>
+<p>Los archivos contienen 120.752 recursos formales de proveedores. Alrededor del 30% de los recursos resueltos prospera, total o parcialmente. Los proveedores ya gastan dinero impugnando resultados de contratación, y con frecuencia ganan.</p>
+<h3><span class="n">7.4</span>Lo que la plataforma se niega a responder</h3>
+<p>La credibilidad es el producto, así que las negativas importan tanto como las respuestas.</p>
+<p><strong>La duración entre adjudicación y pago no es citable.</strong> Está censurada en un 99,8%: 16 observaciones completas contra 8.122 sin concluir. El método estadístico se niega a producir una mediana y nosotros también.</p>
+<p><strong>Cerca del 59% de los códigos de producto no son comparables en precio.</strong> Uno abarca un factor de 2,08 × 10¹³, lo cual es un artefacto de unidad de medida y no corrupción. Para esos códigos, negarse a responder es la salida correcta.</p>
+<p><strong>Los tamizajes de colusión permanecen en silencio con datos aleatorios.</strong> En diez ensayos aleatorizados sobre mercados sintéticos concentrados, tres de cuatro tamizajes no devuelven nada. Sobre datos reales devuelven un grupo de rotación de ofertas de 110.912 evaluados y tres pares de pérdida sistemática de 7.590. Son indicadores que señalan casos que merecen revisión humana, nunca hallazgos que señalen a un culpable.</p>
+<h2 class="brk"><span class="n">8</span>Productos y servicios</h2>
+<p>Tres líneas, sobre la misma plataforma.</p>
+<h3><span class="n">8.1</span>Inteligencia de oferta para proveedores</h3>
+<p>La alerta de alteración es una funcionalidad, no el producto. Una alerta de alteración se dispara pocas veces, y un servicio cuya respuesta habitual es &quot;no cambió nada&quot; es difícil de vender. Lo que un proveedor necesita a diario:</p>
+<ul>
+<li><strong>Análisis de por qué ganó o perdió.</strong> Perdió. Aquí está quién ganó, a qué precio unitario, cómo se comparó el suyo, si el sistema de evaluación cambió después de publicado y si el ganador arrastra sanciones.</li>
+<li><strong>Comportamiento de pago por institución.</strong> El flujo de caja es la primera preocupación de cualquier proveedor del Estado en América Latina. Ordenar instituciones según cómo se comportan realmente requiere el historial unido y no está disponible en ningún otro lado.</li>
+<li><strong>Vigilancia de excepciones.</strong> Si una institución empieza a comprar su categoría bajo excepción de proveedor único, su mercado se está cerrando. Hoy nadie recibe ese aviso.</li>
+<li><strong>Seguimiento de competidores.</strong> Alertas cuando un rival identificado oferta, gana o es sancionado.</li>
+</ul>
+<p>Hoy un proveedor costarricense oferta prácticamente a ciegas. Con una tasa de oferente único del 41,1%, ni siquiera puede distinguir si un mercado está genuinamente sin competencia o cerrado en silencio.</p>
+<h3><span class="n">8.2</span>Evidencia para recursos</h3>
+<p>Dos cosas hacen que esto funcione y no eran obvias.</p>
+<p><strong>Los prospectos están en los datos.</strong> Cada empresa que presenta un recurso queda identificada, con actualización diaria. Eso es una lista continuamente renovada de compañías que ya demostraron disposición a pelear: unas 19.000 presentaciones al año provenientes de 5.469 empresas distintas.</p>
+<p><strong>Los recursos corren contra reloj.</strong> Cuando un cartel se modifica después de publicado, los oferentes afectados tienen una ventana legal limitada. Una alerta con un plazo adjunto convierte mucho mejor que un informe. El entregable debe ser una pieza de prueba: un documento firmado, con relato de cadena de custodia y un enlace verificable de forma independiente, no un archivo de datos.</p>
+<h3><span class="n">8.3</span>Servicio institucional</h3>
+<p>Ninguna institución compra ser vigilada, así que el planteamiento tiene que cambiar.</p>
+<ul>
+<li><strong>Autoevaluación previa a la auditoría.</strong> La Contraloría determinó que solo 9 de 182 instituciones usaban SICOP hasta su etapa final. Una institución ahora puede saber dónde está antes de que lleguen los auditores.</li>
+<li><strong>Comparación con pares</strong> en tasa de competencia, uso de excepciones y velocidad procedimental.</li>
+<li><strong>Un portal público de verificación</strong> con el nombre de la propia institución, que para una institución bien gestionada es un activo reputacional y no una amenaza.</li>
+</ul>
+<h2 class="brk"><span class="n">9</span>Mercado</h2>
+<p>Todas las cifras siguientes están medidas desde el índice, no estimadas.</p>
+<table>
+<thead>
+<tr>
+<th>Cantidad</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Proveedores oferentes distintos, histórico</td>
+<td>25.645</td>
+</tr>
+<tr>
+<td>Activos en los últimos 12 meses</td>
+<td>7.254</td>
+</tr>
+<tr>
+<td><strong>Que ofertan 12 o más veces al año</strong></td>
+<td><strong>1.845</strong></td>
+</tr>
+<tr>
+<td>Proveedores que alguna vez ganaron</td>
+<td>10.448</td>
+</tr>
+<tr>
+<td>Empresas que han presentado un recurso</td>
+<td>5.469</td>
+</tr>
+<tr>
+<td>Instituciones compradoras</td>
+<td>461</td>
+</tr>
+</tbody></table>
+<p>La cifra de 1.845 es el perfil real de cliente: empresas para las cuales la contratación pública es una línea de negocio y no un evento ocasional.</p>
+<h3><span class="n">9.1</span>Modelo de ingresos solo para Costa Rica</h3>
+<table>
+<thead>
+<tr>
+<th>Línea</th>
+<th>Rango</th>
+<th>Base</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Suscripciones de proveedores</td>
+<td>$330k – $665k</td>
+<td>10 a 20% de 1.845 a $150 al mes</td>
+</tr>
+<tr>
+<td>Contratos institucionales</td>
+<td>$460k – $920k</td>
+<td>5 a 10% de 461 a $20k al año</td>
+</tr>
+<tr>
+<td>Paquetes de evidencia</td>
+<td>$100k – $300k</td>
+<td>3 a 8% de ~19.000 recursos anuales</td>
+</tr>
+<tr>
+<td><strong>Total recurrente anual</strong></td>
+<td><strong>$0,9M – $1,9M</strong></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Con múltiplos de software vertical de tres a seis veces los ingresos, eso es un negocio de aproximadamente $3M a $11M si se ejecuta completo en un solo país pequeño.</p>
+<h3><span class="n">9.2</span>El caso regional</h3>
+<p>Panamá, Guatemala, Honduras y El Salvador operan sistemas estructuralmente idénticos. Perú y Colombia son mucho más grandes. Nada en la plataforma es específico de Costa Rica salvo el adaptador de ingesta y parte del vocabulario.</p>
+<p>Una presencia regional alcanza de forma plausible entre $3M y $10M de ingresos recurrentes anuales, que con los mismos múltiplos son $15M a $60M. Esta es además la única versión de la historia en la que una cadena de bloques centroamericana es un hecho estructural y no una frase de mercadeo.</p>
+<h3><span class="n">9.3</span>Cuánto vale hoy</h3>
+<p>Cerca de lo que costaría reconstruirla. No hay ingresos ni un solo cliente pagando. Un equipo competente necesitaría de tres a seis meses para reproducir la plataforma, así que la cifra honesta es el costo de ingeniería más el valor de opción sobre un archivo que se acumula.</p>
+<p>Nos resistiríamos a cualquier número mayor hasta que alguien haya pagado.</p>
+<h2 class="brk"><span class="n">10</span>Qué es defendible, dicho sin adornos</h2>
+<p>Los archivos son públicos. Un competidor podría descargar los 189 hoy y reconstruir el índice en una semana. Quien presente esto como una barrera técnica inexpugnable está exagerando.</p>
+<p>Lo que un competidor no puede obtener:</p>
+<p><strong>Lo que los archivos decían antes de ser reescritos.</strong> Tenemos la única copia. El Internet Archive no tiene ninguna. Ocurrieron cinco eventos de republicación entre 2024 y 2026 sin que nadie guardara una línea base.</p>
+<p><strong>Procedencia.</strong> Nuestra copia está anclada a una cadena pública. La copia de un competidor es una afirmación sobre un archivo en su disco.</p>
+<p>Así que la ventaja es casi nula hacia el pasado y <strong>se acumula día a día desde ahora</strong>. Cada reescritura futura amplía una brecha que jamás podrá cerrarse de forma retroactiva. Es una forma inusual de activo, y es el argumento más fuerte de todo este documento a favor de correr el proceso diario sin interrupción.</p>
+<p>El rigor analítico es una ventaja real pero temporal. Un competidor serio termina encontrando los mismos defectos que encontramos nosotros.</p>
+<h2 class="brk"><span class="n">11</span>Riesgos</h2>
+<p><strong>La gobernanza es el mayor riesgo por amplio margen.</strong> Quien tenga la llave de anclaje escribe las raíces. Un sistema de integridad en contratación vale exactamente lo que valga la independencia de esa parte. Si la misma organización tiene interés comercial en la venta de tokens, el primer periodista competente que conecte esos dos hechos termina con el programa, y ninguna cantidad de ingeniería lo sobrevive. El remedio es estructural: la cuenta de anclaje corresponde a un grupo nombrado de instituciones sin interés económico en los resultados de la contratación, y el conjunto de validadores debería verse compuesto por ellas.</p>
+<p><strong>Afirmar de más.</strong> Ancla demuestra que un registro publicado cambió o no cambió, hacia adelante desde el momento del anclaje. No demuestra que un registro sea correcto, no detecta corrupción y no puede auditar nada anterior a su primer anclaje. Tampoco puede ver contratos que nunca entraron a SICOP, y la Contraloría determinó que el 27,1% de los recursos adjudicados en 2021 fluyó por fuera de la plataforma. No se puede detectar una ausencia en un conjunto de datos que solo registra lo presente.</p>
+<p><strong>Deriva de reglas.</strong> Si las reglas de canonicalización cambian sin cambiar la versión, todo compromiso anterior queda imposible de verificar. La versión va estampada en cada anclaje y las versiones publicadas nunca se modifican.</p>
+<p><strong>Dependencia de la fuente.</strong> El proceso lee un único punto público que no controlamos. El espejo completo es la mitigación. Vale la pena construir una segunda vía de ingesta antes de cualquier piloto institucional.</p>
+<p><strong>Continuidad de la cadena.</strong> Si DecentralChain deja de producir bloques, el anclaje se detiene. Un sello de tiempo secundario y gratuito hacia Bitcoin cubre el sello, aunque no el estado consultable, y conviene agregarlo.</p>
+<p><strong>Legal.</strong> La Ley 8968 regula los datos personales y un reemplazo más cercano a las reglas europeas está en la Asamblea desde 2022. La exposición es baja porque Ancla ancla huellas de datos que el Estado publicó deliberadamente. Amerita una hora de asesoría legal costarricense antes del primer piloto institucional, no ahora.</p>
+<h2 class="brk"><span class="n">12</span>Estado y qué sigue</h2>
+<table>
+<thead>
+<tr>
+<th>Componente</th>
+<th>Estado</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Espejo histórico</td>
+<td>189 archivos, 3,04 GB, completo</td>
+</tr>
+<tr>
+<td>Canonicalización y pruebas de Merkle</td>
+<td>funcionando, con versión estampada</td>
+</tr>
+<tr>
+<td>Detección de cambios</td>
+<td>funcionando, probada contra archivos reales</td>
+</tr>
+<tr>
+<td>Proceso diario de vigilancia</td>
+<td>funcionando, señala meses con cambios de fondo</td>
+</tr>
+<tr>
+<td>Anclaje a la red principal</td>
+<td><strong>activo desde el 27 de agosto de 2026</strong></td>
+</tr>
+<tr>
+<td>Índice longitudinal</td>
+<td>189 meses, ~6 millones de filas</td>
+</tr>
+<tr>
+<td>Resolución de entidades</td>
+<td>72.105 actores resueltos</td>
+</tr>
+<tr>
+<td>Análisis y tamizajes</td>
+<td>funcionando</td>
+</tr>
+<tr>
+<td>API REST y exportación OCDS</td>
+<td>funcionando</td>
+</tr>
+<tr>
+<td>Aplicación web en español y verificador</td>
+<td>funcionando</td>
+</tr>
+<tr>
+<td>Pruebas automatizadas</td>
+<td>306 aprobadas</td>
+</tr>
+</tbody></table>
+<p>Pendiente: el anclaje retroactivo de las 189 raíces está preparado pero no transmitido, y la detección de cambios aún no ha capturado una reescritura en vivo porque no ha ocurrido ninguna desde que se tomó el espejo. Según el registro histórico, la republicación ocurre cerca de dos veces al año.</p>
+<p><strong>Próximos 90 días.</strong> Anclar a diario sin interrupción. Completar el anclaje retroactivo. Publicar el verificador y el feed de cambios. Entrevistar a treinta de los 1.845 oferentes frecuentes y averiguar si pagarían.</p>
+<p><strong>Tres a nueve meses.</strong> Capturar y publicar la primera reescritura en vivo. Firmar una institución, con mayor probabilidad una municipalidad o una universidad, donde una sola persona puede decir que sí.</p>
+<p><strong>Nueve a dieciocho meses.</strong> Acercarse a la Contraloría como aliada, a RACSA con una especificación de integración y a Hacienda como titular del presupuesto. Son tres conversaciones distintas y mezclarlas mata las tres.</p>
+<p><strong>Más allá.</strong> La misma plataforma apuntada a Panamá, Guatemala, Honduras y El Salvador.</p>
+<p>El valor de corto plazo ya está asegurado sin importar cómo avance la ruta comercial. Desde el 27 de agosto de 2026, el registro publicado de contratación pública de Costa Rica tiene un testigo que antes no tenía, y mantenerlo cuesta menos de un dólar al año.</p>
+<h2 class="brk"><span class="n">13</span>Verifique cualquiera de estos datos usted mismo</h2>
+<pre><code class="language-bash"># qué contiene la fuente y qué ha reescrito
+node packages/ingest/src/cli.ts survey
+
+# la raíz anclada, leída desde un nodo público
+curl https://mainnet-node.decentralchain.io/addresses/data/\
+3DTwG5ZydbJDuLdEmwfgDEH3NuwDrgwQFtF/root_2026-08-27_202512
+
+# una prueba para un contrato real
+node packages/cli/src/main.ts prove 202512 Contratos &quot;CE201907001175|01&quot;
+
+# las cifras de competencia
+node packages/analytics/src/cli.ts competition
+</code></pre>
+<h2 class="brk"><span class="n">14</span>Fuentes</h2>
+<ol>
+<li>Observatorio de Compra Pública, descargas masivas de SICOP</li>
+<li>Contraloría General de la República, DFOE-CAP-SGP-00005-2021. Origen de los hallazgos del 27,1% y de 9 de 182</li>
+<li>Foro Económico Mundial, <em>Exploring Blockchain Technology for Government Transparency</em>. El programa de Colombia</li>
+<li>BID Lab, LACChain y LACNet convertidos en LNet, setiembre 2025. El programa de Perú</li>
+<li>Índice de Gobierno Digital de la OCDE 2025. Costa Rica en 0,45 contra un promedio de 0,70, desde 0,22</li>
+<li>Compromiso CR0052 de la Alianza para el Gobierno Abierto, estándares de contratación abierta en SICOP</li>
+<li>Ley General de Contratación Pública 9986, vigente desde diciembre de 2022</li>
+<li>Transacción <code>5QcP1tNimcmt3993fNmyACZ1JmZEaMoMbacUHq7VBxRG</code> en la red principal de DecentralChain, altura 2.316.909</li>
+<li>Repositorio de Ancla, <code>findings/2026-08-26-cross-source.md</code></li>
+</ol>
+
+</main></body></html>
