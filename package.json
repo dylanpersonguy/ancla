@@ -15,7 +15,6 @@
     "check": "node --test packages/*/test/*.test.ts apps/*/test/*.test.ts"
   },
   "dependencies": {
-    "@decentralchain/transactions": "^5.0.0",
     "@decentralchain/ts-lib-crypto": "^2.0.0"
   },
   "devDependencies": {
