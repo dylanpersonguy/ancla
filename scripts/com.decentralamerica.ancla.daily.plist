@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.decentralamerica.ancla.daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/dylanshilts/code/ancla/scripts/daily.sh</string>
+  </array>
+
+  <!-- Local time. The Observatorio refreshes around 13:00 UTC, so this reads
+       after the publisher has finished writing rather than during. -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+
+  <!-- launchd runs a missed calendar job when the machine next wakes, which is
+       what makes this survive a closed laptop. It does not make it a good
+       long-term home: see the note in scripts/daily.sh. -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/dylanshilts/ancla-data/logs/launchd.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/dylanshilts/ancla-data/logs/launchd.err.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <!-- Armed 2026-09-02. Each run signs one data transaction with the key at
+         ~/ancla-data/anchor.key and broadcasts it: roughly 0.001 DCC a day. Set
+         this to 0 to fall back to printing the plan. -->
+    <key>ANCLA_BROADCAST</key>
+    <string>1</string>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+</dict>
+</plist>
