@@ -31,7 +31,25 @@ NODE="${ANCLA_NODE:-$(command -v node || echo /opt/homebrew/bin/node)}"
 
 say() { printf '%s  %s\n' "$(date -u +%H:%M:%SZ)" "$*" >>"$LOG"; }
 
+# The seed is read from the login keychain when it is there, so the signing key
+# does not have to sit in a readable file. loadSeed prefers ANCLA_SEED over
+# ~/ancla-data/anchor.key, so this is the whole integration.
+#
+# It is exported only for the anchor step, never logged, and a miss is silent:
+# the file remains the fallback, and anchor fails loudly on its own if neither
+# exists. Under launchd this works because the login keychain is unlocked for a
+# logged-in session, and a run deferred to wake happens after unlock.
+if SEED="$(security find-generic-password -a ancla -s ancla-anchor-seed -w 2>/dev/null)" \
+   && [ -n "$SEED" ]; then
+  export ANCLA_SEED="$SEED"
+  SEED_SOURCE="keychain"
+else
+  SEED_SOURCE="file"
+fi
+unset SEED
+
 say "=== ancla daily start ==="
+say "seed source: $SEED_SOURCE"
 status=0
 
 say "--- mirror Panama"
