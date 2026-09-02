@@ -91,7 +91,7 @@ export async function mirrorPeriod(
 ): Promise<PeriodOutcome> {
   const observedAt = new Date().toISOString();
   const log = opts.onProgress ?? (() => {});
-  const base = { source: source.id, period, observedAt };
+  const base = { source: source.id, period, observedAt, tlsVerified: !source.unverifiedTls };
 
   let h: Awaited<ReturnType<Source['head']>>;
   try {

@@ -41,6 +41,7 @@ function parseArgs(argv: string[]) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--force') out.force = true;
+    else if (a === '--accept-unverified-tls') out.acceptUnverifiedTls = true;
     else if (a === '--from') out.from = argv[++i] as string;
     else if (a === '--to') out.to = argv[++i] as string;
     else if (a === '-s' || a === '--source') out.source = argv[++i] as string;
@@ -196,6 +197,7 @@ function usage(): void {
       '  survey [--source S]             HEAD every period; size + rewrite report\n' +
       '  mirror [--source S]             download everything new or changed\n' +
       '         [--from P] [--to P] [-c N] [--force]\n' +
+      '         [--accept-unverified-tls]\n' +
       '  status [--source S]             what we hold, and what has changed\n\n' +
       'Sources:\n' +
       SOURCES.map((s) => `  ${s.id.padEnd(20)} ${s.country}  ${s.label}\n`).join('') +
@@ -209,19 +211,54 @@ function usage(): void {
  * with it set rather than making every caller remember an env var, and leave a
  * sentinel so a failure to apply it cannot become a fork bomb.
  */
-function reexecWithCa(source: Source): boolean {
-  if (!source.extraCa || process.env.ANCLA_CA_APPLIED) return false;
+function reexecWithCa(source: Source, accepted: boolean): boolean {
+  const needsCa = Boolean(source.extraCa);
+  const needsInsecure = Boolean(source.unverifiedTls) && accepted;
+  if ((!needsCa && !needsInsecure) || process.env.ANCLA_CA_APPLIED) return false;
   const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...process.argv.slice(2)], {
     stdio: 'inherit',
-    env: { ...process.env, NODE_EXTRA_CA_CERTS: source.extraCa, ANCLA_CA_APPLIED: '1' },
+    env: {
+      ...process.env,
+      ANCLA_CA_APPLIED: '1',
+      ...(needsCa ? { NODE_EXTRA_CA_CERTS: source.extraCa } : {}),
+      // Scoped to a child that mirrors this one source, so a run against a
+      // properly certified publisher never inherits it.
+      ...(needsInsecure ? { NODE_TLS_REJECT_UNAUTHORIZED: '0' } : {}),
+    },
   });
   process.exitCode = r.status ?? 1;
   return true;
 }
 
+/**
+ * A source we cannot authenticate is opt-in per run. Defaulting to "mirror it
+ * anyway" would put unverified bytes in the same store as verified ones with
+ * nothing at the call site to show for it.
+ */
+function tlsGate(source: Source, accepted: boolean): boolean {
+  if (!source.unverifiedTls) return true;
+  if (!accepted) {
+    process.stderr.write(
+      `${source.label} cannot be authenticated: ${source.unverifiedTls.reason}\n` +
+        `Observed ${source.unverifiedTls.observed}.\n\n` +
+        'Mirroring anyway means the archive is what someone served us, not\n' +
+        'provably what the publisher did. Every observation will record\n' +
+        'tlsVerified: false. To proceed, pass --accept-unverified-tls\n',
+    );
+    return false;
+  }
+  process.stderr.write(
+    `warning: ${source.label} — TLS not verified (${source.unverifiedTls.reason})\n\n`,
+  );
+  return true;
+}
+
 try {
   const source = resolveSource(args.source as string | undefined);
-  if (!reexecWithCa(source)) {
+  const accepted = Boolean(args.acceptUnverifiedTls);
+  if (!tlsGate(source, accepted)) {
+    process.exitCode = 1;
+  } else if (!reexecWithCa(source, accepted)) {
   switch (cmd) {
     case 'survey':
       await survey(source, args);

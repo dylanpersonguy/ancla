@@ -49,6 +49,19 @@ export type Source = {
    * disabling it would not.
    */
   extraCa?: string;
+  /**
+   * Set only when the publisher's certificate cannot be validated at all and we
+   * have decided the mirror is still worth having.
+   *
+   * This is not the same defect as `extraCa`, which is a chain we can complete
+   * and then verify properly. Here there is nothing to complete: the connection
+   * is unauthenticated, so the archive is what *someone* served us. The mirror
+   * still refuses to run without an explicit flag, every observation records
+   * `tlsVerified: false`, and anything built on those bytes inherits the
+   * caveat. Anchoring a forgery would be worse than having no mirror, and the
+   * only defence against that is saying so in the data.
+   */
+  unverifiedTls?: { reason: string; observed: string };
   periodRange(from: Period, to: Period): Period[];
   currentPeriod(now: Date): Period;
   url(period: Period): string;
@@ -105,6 +118,28 @@ export function monthClosesAt(period: Period, graceDays = 2): number {
   const y = Number(period.slice(0, 4));
   const m = Number(period.slice(4, 6));
   return Date.UTC(y, m, 1) + graceDays * 86_400_000;
+}
+
+/** Every year from `from` through `to`, inclusive. */
+export function yearRange(from: Period, to: Period): Period[] {
+  const out: Period[] = [];
+  for (let y = Number(from); y <= Number(to); y++) out.push(String(y));
+  return out;
+}
+
+export function currentYear(now: Date): Period {
+  return String(now.getUTCFullYear());
+}
+
+/**
+ * First instant after a year has closed and settled.
+ *
+ * The grace is a month rather than the two days a monthly archive gets. An
+ * annual file legitimately keeps growing all year, and publishers routinely top
+ * December up in January; calling that a rewrite would flag every year once.
+ */
+export function yearClosesAt(period: Period, graceDays = 31): number {
+  return Date.UTC(Number(period) + 1, 0, 1) + graceDays * 86_400_000;
 }
 
 /**

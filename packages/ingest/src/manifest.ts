@@ -29,12 +29,20 @@ export type Observation = {
   /** Path relative to the source root. Null when nothing was stored. */
   path: string | null;
   status: 'stored' | 'unchanged' | 'missing' | 'error';
+  /**
+   * False when the archive arrived over a connection we could not authenticate.
+   * Written on every line so the caveat travels with the bytes: anything that
+   * later reads this manifest can tell a verified archive from one that is only
+   * probably from the publisher.
+   */
+  tlsVerified: boolean;
   /** Populated only when status is 'error'. */
   error?: string;
 };
 
 /** Lines written before the manifest carried a source or used `period`. */
-type LegacyObservation = Omit<Observation, 'source' | 'period'> & {
+type LegacyObservation = Omit<Observation, 'source' | 'period' | 'tlsVerified'> & {
+  tlsVerified?: boolean;
   month?: string;
   period?: string;
   source?: string;
@@ -69,6 +77,11 @@ function normalize(raw: LegacyObservation, source: Source): Observation {
     ...rest,
     source: raw.source ?? source.id,
     period: raw.period ?? month ?? '',
+    // Costa Rica and Panama were both mirrored before this field existed, and
+    // both over a chain that verifies, so absent means true rather than unknown.
+    // The first source that could not be authenticated is also the first whose
+    // lines carry it explicitly.
+    tlsVerified: raw.tlsVerified ?? true,
   } as Observation;
 }
 

@@ -83,9 +83,12 @@ node packages/ingest/src/cli.ts survey
 # mirror every archive. resumable, idempotent, never overwrites
 node packages/ingest/src/cli.ts mirror -c 4
 
-# a second country. --source takes cr (default), pa, or pa-tienda
+# other countries. --source takes cr (default), pa, hn, and the variants below
 node packages/ingest/src/cli.ts survey --source pa
 node packages/ingest/src/cli.ts mirror --source pa -c 4
+
+# Honduras serves an expired certificate, so it is opt-in per run
+node packages/ingest/src/cli.ts mirror --source hn --accept-unverified-tls
 
 # canonicalize archives into Merkle-rooted snapshots
 node packages/cli/src/main.ts snapshot
@@ -116,6 +119,14 @@ every later source lives under `sources/<id>/`. That asymmetry is deliberate —
 | Observatorio de Compra Pública | `cr-observatorio` | month | 201012 – 202608, 189 archives | SICOP + SIAC |
 | PanamaCompra en Cifras | `pa-panamacompra` | month | 202309 – 202609, 37 archives | OCDS; ships an incomplete TLS chain |
 | PanamaCompra tienda virtual | `pa-tienda-virtual` | month | — | catalogue store, separate registry |
+| ONCAE HonduCompras | `hn-oncae-hc1` | year | 2005 – 2026 | OCDS; **certificate expired 2026-07-05** |
+| ONCAE catálogo electrónico | `hn-oncae-ce` | year | 2014 – 2026 | convenio marco orders |
+| ONCAE difusión directa | `hn-oncae-ddc` | year | 2010 – 2019 | discontinued |
+
+Yearly sources are a weaker instrument than monthly ones, and Honduras shows why:
+an annual file legitimately grows all year and is routinely rebuilt afterwards, so
+"this closed period changed" is a much blunter claim than it is for a month. Read
+an ONCAE republication event as a question, not a finding.
 
 Adding one means writing a `Source` and registering it. The bar is not that the
 country publishes data; it is that it publishes **a whole period as one file, at a
@@ -123,8 +134,20 @@ URL we can derive, whose bytes are identical between two fetches**. Fetch the sa
 archive twice and compare before writing an adapter — a portal that rebuilds on
 demand reports a rewrite every day and proves nothing.
 
-Guatemala and Honduras both clear that bar and are not written yet. El Salvador
-and Nicaragua publish no bulk archive at all, so no adapter can reach them.
+Guatemala clears that bar on the data and fails it on access: `ocds.guatecompras.gt`
+and `datos.minfin.gob.gt` both sit behind a Cloudflare challenge (`cf-mitigated:
+challenge`). That is an access control the operator turned on deliberately, so the
+route forward is an access request to MINFIN/DGAE, not a bypass. Its OCDS also
+appears in the OCP data registry, but see below before reaching for that.
+
+El Salvador and Nicaragua publish no bulk archive at all, so no adapter can reach
+them, and the site's `planeado` status for both is the honest one.
+
+**Do not mirror the OCP data registry as a substitute.** Its downloads redirect to
+`fastly.data.open-contracting.org/downloads/<publisher>/<run-id>/<year>.jsonl.gz`
+with a fresh run id each retrieval, because each run re-exports the publisher's
+data. Hashing that detects OCP regenerating its own file, not a government
+rewriting the record, which is the one thing this project claims to detect.
 
 ---
 
