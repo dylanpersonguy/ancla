@@ -22,6 +22,8 @@ import { tableDef } from '../../canonicalize/src/schema.ts';
 import { leafFor } from '../../canonicalize/src/snapshot.ts';
 import { listEntries, readEntry, tableNameOf } from '../../canonicalize/src/zip.ts';
 import { proof, verify as merkleVerify } from '../../merkle/src/index.ts';
+import { OBSERVATORIO } from '../../ingest/src/observatorio.ts';
+import type { Source } from '../../ingest/src/source.ts';
 import { type ArchiveRef, archives, loadOrBuild } from './store.ts';
 
 export type FieldChange = { field: string; before: string | null; after: string | null };
@@ -118,8 +120,13 @@ export function fieldDiff(
   return out.sort((x, y) => x.field.localeCompare(y.field));
 }
 
-async function versionOf(ref: ArchiveRef, table: string, id: string): Promise<RecordVersion> {
-  const snap = await loadOrBuild(ref);
+async function versionOf(
+  ref: ArchiveRef,
+  table: string,
+  id: string,
+  source: Source,
+): Promise<RecordVersion> {
+  const snap = await loadOrBuild(ref, source);
   const idx = snap.records.findIndex((r: CanonRecord) => r.table === table && r.id === id);
   const leaves = snap.records.map(leafFor);
   const rec = idx >= 0 ? snap.records[idx] : null;
@@ -146,12 +153,13 @@ export async function recordHistory(
   month: string,
   table: string,
   id: string,
+  source: Source = OBSERVATORIO,
 ): Promise<RecordHistory> {
-  const refs = await archives(month);
+  const refs = await archives(month, source);
   if (!refs.length) throw new Error(`no archive stored for ${month}`);
 
   const versions: RecordVersion[] = [];
-  for (const ref of refs) versions.push(await versionOf(ref, table, id));
+  for (const ref of refs) versions.push(await versionOf(ref, table, id, source));
 
   if (!versions.some((v) => v.present)) {
     throw new Error(`record not found in any copy of ${month}: ${table} ${id}`);

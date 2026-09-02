@@ -26,8 +26,9 @@ import {
   currentMonth,
   monthRange,
 } from '../../ingest/src/observatorio.ts';
-import { monthClosesAt } from '../../ingest/src/source.ts';
 import { readFile } from 'node:fs/promises';
+import type { Source } from '../../ingest/src/source.ts';
+import { schemaFor } from './schemas.ts';
 import { archives, loadOrBuild, snapshotPath } from './store.ts';
 
 export type WatchFinding = {
@@ -69,29 +70,43 @@ function stampToDate(stamp: string): Date | null {
  * monthClosesAt is imported rather than restated. Two definitions of "closed"
  * living in two files is what produced the false positive.
  */
-export function rewrittenAfterClose(month: string, currentStamp: string): boolean {
+export function rewrittenAfterClose(
+  source: Source,
+  period: string,
+  currentStamp: string,
+): boolean {
   const written = stampToDate(currentStamp);
-  return written ? written.getTime() > monthClosesAt(month) : false;
+  return written ? written.getTime() > source.closesAt(period) : false;
 }
 
 export async function runWatch(
-  opts: { from?: string; to?: string; concurrency?: number; log?: (s: string) => void } = {},
+  opts: {
+    from?: string;
+    to?: string;
+    concurrency?: number;
+    source?: Source;
+    log?: (s: string) => void;
+  } = {},
 ): Promise<WatchReport> {
   const now = new Date();
   const log = opts.log ?? (() => {});
-  const list = monthRange(opts.from ?? FIRST_MONTH, opts.to ?? currentMonth(now));
+  const source = opts.source ?? OBSERVATORIO;
+  const list = source.periodRange(
+    opts.from ?? source.firstPeriod,
+    opts.to ?? source.currentPeriod(now),
+  );
 
   const before = new Map<string, number>();
-  for (const month of list) before.set(month, (await archives(month)).length);
+  for (const month of list) before.set(month, (await archives(month, source)).length);
 
   log(`checking ${list.length} months upstream`);
   const updated: string[] = [];
   for (const month of list) {
-    // Costa Rica only, and not by oversight: everything below this line —
-    // store.ts, buildSnapshot, diff — reads SICOP's archive layout and CSV
-    // schema. Mirroring is multi-source; the evidence chain built on top of it
-    // is not, and pointing this at Panama would produce snapshots of nothing.
-    const outcome = await mirrorPeriod(OBSERVATORIO, month, {
+    // schemaFor throws for a source with no table keys, which is the honest
+    // failure: its archives can be mirrored and hashed, but canonicalising them
+    // with another country's keys would invent identities and make every later
+    // comparison meaningless.
+    const outcome = await mirrorPeriod(source, month, {
       concurrency: 1,
       force: false,
       onProgress: () => {},
@@ -104,20 +119,20 @@ export async function runWatch(
 
   const findings: WatchFinding[] = [];
   for (const month of updated) {
-    const refs = await archives(month);
+    const refs = await archives(month, source);
     // A first-ever copy is a baseline, not a change.
     if (refs.length < 2 || (before.get(month) ?? 0) === 0) continue;
 
     const prev = refs[refs.length - 2];
     const cur = refs[refs.length - 1];
-    const prevSnap = await loadOrBuild(prev);
-    const curSnap = buildSnapshot(month, await readFile(cur.path));
-    await writeSnapshot(snapshotPath(cur), curSnap);
+    const prevSnap = await loadOrBuild(prev, source);
+    const curSnap = buildSnapshot(month, await readFile(cur.path), schemaFor(source.id));
+    await writeSnapshot(snapshotPath(cur, source), curSnap);
 
     const d = diff(prevSnap, curSnap, { limit: 200 });
     findings.push({
       month,
-      closedMonth: rewrittenAfterClose(month, cur.stamp),
+      closedMonth: rewrittenAfterClose(source, month, cur.stamp),
       previousStamp: prev.stamp,
       currentStamp: cur.stamp,
       diff: d,

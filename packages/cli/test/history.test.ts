@@ -43,3 +43,24 @@ test('a field present in one copy and missing in the other is a difference', () 
 test('a removed record diffs its fields against nothing', () => {
   assert.deepEqual(fieldDiff({ A: 'x' }, null), [{ field: 'A', before: 'x', after: null }]);
 });
+
+import { OBSERVATORIO } from '../../ingest/src/observatorio.ts';
+import { PANAMACOMPRA } from '../../ingest/src/panamacompra.ts';
+import { loadOrBuild } from '../src/store.ts';
+
+test('an archive cannot be canonicalised under another publisher keys', async () => {
+  // A buggy call did exactly this: a Costa Rican archive was canonicalised with
+  // Panama's table keys and written into Panama's snapshot store. Every record
+  // in it had an invented identity, and nothing in the output said so.
+  const ref = {
+    source: OBSERVATORIO.id,
+    month: '202607',
+    file: 'x.zip',
+    path: '/nonexistent',
+    stamp: '20260810T213129Z',
+  };
+  await assert.rejects(
+    () => loadOrBuild(ref, PANAMACOMPRA),
+    /archive is from cr-observatorio but the store was asked for pa-panamacompra/,
+  );
+});
