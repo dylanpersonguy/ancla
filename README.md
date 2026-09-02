@@ -83,6 +83,10 @@ node packages/ingest/src/cli.ts survey
 # mirror every archive. resumable, idempotent, never overwrites
 node packages/ingest/src/cli.ts mirror -c 4
 
+# a second country. --source takes cr (default), pa, or pa-tienda
+node packages/ingest/src/cli.ts survey --source pa
+node packages/ingest/src/cli.ts mirror --source pa -c 4
+
 # canonicalize archives into Merkle-rooted snapshots
 node packages/cli/src/main.ts snapshot
 
@@ -100,6 +104,27 @@ node packages/delivery/src/serve.ts
 The mirror lives **outside** the repo. Default `$HOME/ancla-data`, override with
 `ANCLA_DATA`. It reaches roughly 12 GB with archives, snapshots and the index, and
 none of it belongs in git.
+
+Costa Rica keeps the original paths (`archives/`, `manifest.jsonl` at the root);
+every later source lives under `sources/<id>/`. That asymmetry is deliberate — see
+`legacyRoot` in `packages/ingest/src/source.ts`.
+
+## Sources
+
+| Source | Id | Granularity | Coverage seen | Notes |
+|---|---|---|---|---|
+| Observatorio de Compra Pública | `cr-observatorio` | month | 201012 – 202608, 189 archives | SICOP + SIAC |
+| PanamaCompra en Cifras | `pa-panamacompra` | month | 202309 – 202609, 37 archives | OCDS; ships an incomplete TLS chain |
+| PanamaCompra tienda virtual | `pa-tienda-virtual` | month | — | catalogue store, separate registry |
+
+Adding one means writing a `Source` and registering it. The bar is not that the
+country publishes data; it is that it publishes **a whole period as one file, at a
+URL we can derive, whose bytes are identical between two fetches**. Fetch the same
+archive twice and compare before writing an adapter — a portal that rebuilds on
+demand reports a rewrite every day and proves nothing.
+
+Guatemala and Honduras both clear that bar and are not written yet. El Salvador
+and Nicaragua publish no bulk archive at all, so no adapter can reach them.
 
 ---
 

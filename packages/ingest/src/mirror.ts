@@ -1,10 +1,10 @@
 /**
- * Mirror the Observatorio archives, never overwriting.
+ * Mirror a source's archives, never overwriting.
  *
- * Archives are stored as archives/<month>/<lastModified>-<sha256 prefix>.zip.
+ * Archives are stored as archives/<period>/<lastModified>-<sha256 prefix>.<ext>.
  * That naming does three jobs at once: re-running is idempotent, a rewritten
- * month lands beside its predecessor instead of clobbering it, and the directory
- * listing for a month IS its revision history.
+ * period lands beside its predecessor instead of clobbering it, and the
+ * directory listing for a period IS its revision history.
  */
 
 import { createHash } from 'node:crypto';
@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as manifest from './manifest.ts';
-import { type Month, archiveUrl, compactStamp, head } from './observatorio.ts';
+import { type Period, type Source, compactStamp } from './source.ts';
 
 const MAX_ATTEMPTS = 4;
 const RETRY_BASE_MS = 1500;
@@ -26,14 +26,18 @@ export type MirrorOptions = {
   onProgress?: (line: string) => void;
 };
 
-function archiveDir(month: Month): string {
-  return join(manifest.dataRoot(), 'archives', month);
+function archiveDir(source: Source, period: Period): string {
+  return join(manifest.archivesRoot(source), period);
 }
 
 /** Have we already stored a copy carrying this Last-Modified stamp? */
-async function existingForStamp(month: Month, stamp: string): Promise<string | null> {
+async function existingForStamp(
+  source: Source,
+  period: Period,
+  stamp: string,
+): Promise<string | null> {
   try {
-    const files = await readdir(archiveDir(month));
+    const files = await readdir(archiveDir(source, period));
     return files.find((f) => f.startsWith(`${stamp}-`)) ?? null;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -78,19 +82,23 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
   throw new Error(`${label} failed after ${MAX_ATTEMPTS} attempts: ${String(lastError)}`);
 }
 
-export type MonthOutcome = manifest.Observation;
+export type PeriodOutcome = manifest.Observation;
 
-export async function mirrorMonth(month: Month, opts: MirrorOptions): Promise<MonthOutcome> {
+export async function mirrorPeriod(
+  source: Source,
+  period: Period,
+  opts: MirrorOptions,
+): Promise<PeriodOutcome> {
   const observedAt = new Date().toISOString();
   const log = opts.onProgress ?? (() => {});
+  const base = { source: source.id, period, observedAt };
 
-  let h: Awaited<ReturnType<typeof head>>;
+  let h: Awaited<ReturnType<Source['head']>>;
   try {
-    h = await withRetry(`HEAD ${month}`, () => head(month));
+    h = await withRetry(`HEAD ${period}`, () => source.head(period));
   } catch (err) {
-    const entry: MonthOutcome = {
-      month,
-      observedAt,
+    const entry: PeriodOutcome = {
+      ...base,
       lastModified: null,
       contentLength: null,
       sha256: null,
@@ -98,75 +106,71 @@ export async function mirrorMonth(month: Month, opts: MirrorOptions): Promise<Mo
       status: 'error',
       error: String(err),
     };
-    await manifest.append(entry);
-    log(`  ${month}  error   ${String(err).slice(0, 60)}`);
+    await manifest.append(source, entry);
+    log(`  ${period}  error   ${String(err).slice(0, 60)}`);
     return entry;
   }
 
   if (!h.exists) {
-    const entry: MonthOutcome = {
-      month,
-      observedAt,
+    const entry: PeriodOutcome = {
+      ...base,
       lastModified: null,
       contentLength: null,
       sha256: null,
       path: null,
       status: 'missing',
     };
-    await manifest.append(entry);
-    log(`  ${month}  missing (HTTP ${h.status})`);
+    await manifest.append(source, entry);
+    log(`  ${period}  missing (HTTP ${h.status})`);
     return entry;
   }
 
   const stamp = compactStamp(h.lastModified);
 
   if (!opts.force) {
-    const have = await existingForStamp(month, stamp);
+    const have = await existingForStamp(source, period, stamp);
     if (have) {
-      const entry: MonthOutcome = {
-        month,
-        observedAt,
+      const entry: PeriodOutcome = {
+        ...base,
         lastModified: h.lastModified,
         contentLength: h.contentLength,
         sha256: null,
-        path: join('archives', month, have),
+        path: join('archives', period, have),
         status: 'unchanged',
       };
-      await manifest.append(entry);
-      log(`  ${month}  unchanged`);
+      await manifest.append(source, entry);
+      log(`  ${period}  unchanged`);
       return entry;
     }
   }
 
-  const dir = archiveDir(month);
+  const dir = archiveDir(source, period);
   await mkdir(dir, { recursive: true });
   const tmp = join(dir, `.tmp-${stamp}-${process.pid}`);
 
   try {
-    const { sha256, bytes } = await withRetry(`GET ${month}`, () =>
-      downloadHashed(archiveUrl(month), tmp),
+    const { sha256, bytes } = await withRetry(`GET ${period}`, () =>
+      downloadHashed(source.url(period), tmp),
     );
-    const name = `${stamp}-${sha256.slice(0, 12)}.zip`;
+    const name = `${stamp}-${sha256.slice(0, 12)}.${source.extension}`;
     await rename(tmp, join(dir, name));
 
-    const entry: MonthOutcome = {
-      month,
-      observedAt,
+    const entry: PeriodOutcome = {
+      ...base,
       lastModified: h.lastModified,
       contentLength: bytes,
       sha256,
-      path: join('archives', month, name),
+      path: join('archives', period, name),
       status: 'stored',
     };
-    await manifest.append(entry);
+    await manifest.append(source, entry);
     const mb = (bytes / 1_048_576).toFixed(1);
-    log(`  ${month}  stored  ${mb} MB  ${sha256.slice(0, 12)}`);
+    log(`  ${period}  stored  ${mb} MB  ${sha256.slice(0, 12)}`);
     return entry;
   } catch (err) {
     await rm(tmp, { force: true });
-    const entry: MonthOutcome = {
-      month,
-      observedAt,
+    const entry: PeriodOutcome = {
+      ...base,
       lastModified: h.lastModified,
       contentLength: h.contentLength,
       sha256: null,
@@ -174,46 +178,50 @@ export async function mirrorMonth(month: Month, opts: MirrorOptions): Promise<Mo
       status: 'error',
       error: String(err),
     };
-    await manifest.append(entry);
-    log(`  ${month}  error   ${String(err).slice(0, 60)}`);
+    await manifest.append(source, entry);
+    log(`  ${period}  error   ${String(err).slice(0, 60)}`);
     return entry;
   }
 }
 
-/** Bounded worker pool. Be a polite guest on someone else's blob storage. */
-export async function mirrorAll(months: Month[], opts: MirrorOptions): Promise<MonthOutcome[]> {
-  const results: MonthOutcome[] = new Array(months.length);
+/** Bounded worker pool. Be a polite guest on someone else's storage. */
+export async function mirrorAll(
+  source: Source,
+  periods: Period[],
+  opts: MirrorOptions,
+): Promise<PeriodOutcome[]> {
+  const results: PeriodOutcome[] = new Array(periods.length);
   let next = 0;
-  const workers = Array.from({ length: Math.min(opts.concurrency, months.length) }, async () => {
+  const workers = Array.from({ length: Math.min(opts.concurrency, periods.length) }, async () => {
     while (true) {
       const i = next++;
-      if (i >= months.length) return;
-      results[i] = await mirrorMonth(months[i], opts);
+      if (i >= periods.length) return;
+      results[i] = await mirrorPeriod(source, periods[i] as Period, opts);
     }
   });
   await Promise.all(workers);
   return results;
 }
 
-export async function dataRootSize(): Promise<number> {
-  const root = join(manifest.dataRoot(), 'archives');
+export async function dataRootSize(source: Source): Promise<number> {
+  const root = manifest.archivesRoot(source);
   let total = 0;
-  let months: string[];
+  let periods: string[];
   try {
-    months = await readdir(root);
+    periods = await readdir(root);
   } catch {
     return 0;
   }
-  for (const m of months) {
+  for (const p of periods) {
     let files: string[];
     try {
-      files = await readdir(join(root, m));
+      files = await readdir(join(root, p));
     } catch {
       continue;
     }
     for (const f of files) {
       try {
-        total += (await stat(join(root, m, f))).size;
+        total += (await stat(join(root, p, f))).size;
       } catch {
         /* raced with a rename; skip */
       }
