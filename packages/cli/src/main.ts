@@ -22,6 +22,7 @@ import {
   MAINNET_CHAIN_ID, planAnchor, planAnchorBatched, readRoot, signAnchor, version,
 } from '../../anchor/src/index.ts';
 import { allSnapshotHeaders, archives, loadOrBuild, months, snapshotPath } from './store.ts';
+import { type RecordHistory, recordHistory } from './history.ts';
 import { reportText, runWatch, writeReport } from './watch.ts';
 
 const out = (s = '') => process.stdout.write(`${s}\n`);
@@ -232,6 +233,58 @@ async function cmdProve(month: string, table: string, id: string, day?: string):
   );
 }
 
+/** Trim a value for display without hiding that it was trimmed. */
+function short(v: string | null): string {
+  if (v === null) return '(absent)';
+  if (v === '') return '(empty)';
+  return v.length > 58 ? `${v.slice(0, 55)}…` : v;
+}
+
+function historyText(h: RecordHistory): string {
+  const lines: string[] = [];
+  lines.push(`${h.table}  ${h.id}   ${h.month}`);
+  lines.push('');
+  lines.push(`${h.versions.length} cop${h.versions.length === 1 ? 'y' : 'ies'} held:`);
+  for (const v of h.versions) {
+    const state = v.present ? `leaf ${v.leafIndex} of ${v.leafCount}` : 'not in this copy';
+    const proven = v.present ? (v.verifiesLocally ? 'proof ok' : 'PROOF FAILED') : '';
+    lines.push(`  ${v.stamp}  ${state.padEnd(24)} ${proven}`);
+    if (v.present) lines.push(`    root ${v.merkleRoot}`);
+  }
+
+  if (!h.transitions.length) {
+    lines.push('');
+    lines.push('Never changed across the copies held.');
+    return lines.join('\n');
+  }
+
+  for (const t of h.transitions) {
+    lines.push('');
+    lines.push(`${t.from} -> ${t.to}   ${t.kind.toUpperCase()}`);
+    if (t.kind === 'silentRevision') {
+      lines.push('  changed with no amendment recorded by the publisher.');
+    }
+    for (const f of t.fields) {
+      lines.push(`    ${f.field}`);
+      lines.push(`      before  ${short(f.before)}`);
+      lines.push(`      after   ${short(f.after)}`);
+    }
+    if (!t.fields.length) lines.push('    (no field differs; the encoding changed)');
+  }
+  return lines.join('\n');
+}
+
+async function cmdHistory(
+  month: string,
+  table: string,
+  id: string,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  if (!month || !table || !id) throw new Error('usage: ancla history <YYYYMM> <Table> <id>');
+  const h = await recordHistory(month, table, id);
+  out(flags.json ? JSON.stringify(h, null, 2) : historyText(h));
+}
+
 async function cmdWatch(flags: Record<string, string | boolean>): Promise<void> {
   const r = await runWatch({
     from: flags.from as string | undefined,
@@ -277,6 +330,9 @@ try {
     case 'anchor':
       await cmdAnchor(flags);
       break;
+    case 'history':
+      await cmdHistory(positional[0] as string, positional[1] as string, positional[2] as string, flags);
+      break;
     case 'prove':
       await cmdProve(positional[0], positional[1], positional[2], flags.day as string | undefined);
       break;
@@ -292,6 +348,7 @@ try {
           'ancla',
           '',
           '  survey                        what the source holds and has rewritten',
+          '  history <YYYYMM> <Table> <id> every version of one record, with proofs',
           '  mirror [--from M] [--to M]    fetch archives; resumable, never overwrites',
           '  status                        what we hold and what has changed',
           '  snapshot [month...]           canonicalize into Merkle-rooted snapshots',
