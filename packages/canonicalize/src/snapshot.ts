@@ -15,7 +15,8 @@ import { dirname } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { leafHash, root } from '../../merkle/src/index.ts';
-import { CANON_VERSION, type CanonRecord, canonicalizeTable } from './canonical.ts';
+import { CANON_VERSION, type CanonRecord, canonicalizeTable, } from './canonical.ts';
+import type { Schema } from './schema.ts';
 import { listEntries, readEntry, tableNameOf } from './zip.ts';
 
 export type TableStat = {
@@ -53,7 +54,11 @@ export function leafFor(r: CanonRecord): Buffer {
   return leafHash(`${r.table}\x00${r.id}\x00${r.byteHash}`);
 }
 
-export function buildSnapshot(month: string, archive: Buffer): Snapshot {
+/**
+ * `schema` names the publisher's table keys. Omitted means Costa Rica, which is
+ * the only caller that predates a second source.
+ */
+export function buildSnapshot(month: string, archive: Buffer, schema?: Schema): Snapshot {
   const archiveSha256 = createHash('sha256').update(archive).digest('hex');
   const entries = listEntries(archive);
   const records: CanonRecord[] = [];
@@ -62,7 +67,7 @@ export function buildSnapshot(month: string, archive: Buffer): Snapshot {
   for (const entry of entries) {
     const table = tableNameOf(entry.name);
     if (!table) continue;
-    const res = canonicalizeTable(table, readEntry(archive, entry));
+    const res = canonicalizeTable(table, readEntry(archive, entry), schema);
     tables.push({
       table,
       rows: res.rowCount,

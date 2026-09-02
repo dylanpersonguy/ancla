@@ -18,7 +18,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { type TableDef, tableDef } from './schema.ts';
+import { type TableDef, tableDef, type Schema } from './schema.ts';
 
 export const CANON_VERSION = 'ancla-canon-1';
 
@@ -157,7 +157,11 @@ export type CanonTableResult = {
   duplicateKeys: number;
 };
 
-export function canonicalizeTable(table: string, buf: Buffer): CanonTableResult {
+export function canonicalizeTable(
+  table: string,
+  buf: Buffer,
+  schema?: Schema,
+): CanonTableResult {
   const delim = detectDelimiter(buf);
   const it = parseCsv(buf, delim);
   const first = it.next();
@@ -173,7 +177,7 @@ export function canonicalizeTable(table: string, buf: Buffer): CanonTableResult 
     };
   }
   const header = first.value.map((h) => h.trim().replace(/^﻿/, ''));
-  const def: TableDef | null = tableDef(table);
+  const def: TableDef | null = tableDef(table, schema);
   const keyCols = (def?.key ?? []).filter((k) => header.includes(k));
   const usable = keyCols.length === (def?.key.length ?? 0) && keyCols.length > 0;
   const volatile = new Set(def?.volatile ?? []);

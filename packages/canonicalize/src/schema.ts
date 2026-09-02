@@ -71,6 +71,9 @@ export const TABLES: Record<string, TableDef> = {
   Sistemas: { key: ['NRO_SICOP', 'NUMERO_LINEA', 'NUMERO_PARTIDA'] },
 };
 
-export function tableDef(name: string): TableDef | null {
-  return TABLES[name] ?? null;
+/** A publisher's table keys. TABLES is Costa Rica's; see schema-pa.ts. */
+export type Schema = Record<string, TableDef>;
+
+export function tableDef(name: string, schema: Schema = TABLES): TableDef | null {
+  return schema[name] ?? null;
 }
