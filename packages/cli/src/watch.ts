@@ -19,8 +19,14 @@ import { join } from 'node:path';
 import { buildSnapshot, writeSnapshot } from '../../canonicalize/src/snapshot.ts';
 import { type DiffResult, diff, summarize } from '../../differ/src/index.ts';
 import { dataRoot } from '../../ingest/src/manifest.ts';
-import { mirrorMonth } from '../../ingest/src/mirror.ts';
-import { FIRST_MONTH, currentMonth, monthRange } from '../../ingest/src/observatorio.ts';
+import { mirrorPeriod } from '../../ingest/src/mirror.ts';
+import {
+  FIRST_MONTH,
+  OBSERVATORIO,
+  currentMonth,
+  monthRange,
+} from '../../ingest/src/observatorio.ts';
+import { monthClosesAt } from '../../ingest/src/source.ts';
 import { readFile } from 'node:fs/promises';
 import { archives, loadOrBuild, snapshotPath } from './store.ts';
 
@@ -40,10 +46,32 @@ export type WatchReport = {
 };
 
 /** A month is closed once its own calendar month has ended. */
-function isClosed(month: string, now: Date): boolean {
-  const y = Number(month.slice(0, 4));
-  const m = Number(month.slice(4, 6));
-  return Date.UTC(y, m, 1) <= now.getTime();
+/** `20260831T130427Z` -> Date. The inverse of compactStamp. */
+function stampToDate(stamp: string): Date | null {
+  const m = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(stamp);
+  if (!m) return null;
+  return new Date(
+    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6])),
+  );
+}
+
+/**
+ * Did this copy land after its month was final?
+ *
+ * The question is about the archive's own write time, not about today. An
+ * earlier version asked whether the month had ended by the time the check ran,
+ * which is a different question with the same answer most of the time and the
+ * wrong answer exactly when it matters. On 2026-09-02 it read a copy written
+ * 2026-08-31T13:04Z — eleven hours before August closed, the ordinary last
+ * daily refresh — and reported August as a rewritten closed month with 261,243
+ * records "added". A check that cries wolf is ignored on the day it is right.
+ *
+ * monthClosesAt is imported rather than restated. Two definitions of "closed"
+ * living in two files is what produced the false positive.
+ */
+export function rewrittenAfterClose(month: string, currentStamp: string): boolean {
+  const written = stampToDate(currentStamp);
+  return written ? written.getTime() > monthClosesAt(month) : false;
 }
 
 export async function runWatch(
@@ -59,7 +87,11 @@ export async function runWatch(
   log(`checking ${list.length} months upstream`);
   const updated: string[] = [];
   for (const month of list) {
-    const outcome = await mirrorMonth(month, {
+    // Costa Rica only, and not by oversight: everything below this line —
+    // store.ts, buildSnapshot, diff — reads SICOP's archive layout and CSV
+    // schema. Mirroring is multi-source; the evidence chain built on top of it
+    // is not, and pointing this at Panama would produce snapshots of nothing.
+    const outcome = await mirrorPeriod(OBSERVATORIO, month, {
       concurrency: 1,
       force: false,
       onProgress: () => {},
@@ -85,7 +117,7 @@ export async function runWatch(
     const d = diff(prevSnap, curSnap, { limit: 200 });
     findings.push({
       month,
-      closedMonth: isClosed(month, now),
+      closedMonth: rewrittenAfterClose(month, cur.stamp),
       previousStamp: prev.stamp,
       currentStamp: cur.stamp,
       diff: d,
