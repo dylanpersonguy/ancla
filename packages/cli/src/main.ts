@@ -166,13 +166,14 @@ async function cmdAnchor(flags: Record<string, string | boolean>, source: Source
 async function cmdAnchorAll(
   day: string,
   flags: Record<string, string | boolean>,
+  source: Source,
 ): Promise<void> {
   const heads = await allSnapshotHeaders(source);
   if (!heads.length) {
     out('no snapshots. run: ancla snapshot');
     return;
   }
-  const batches = planAnchorBatched(day, heads as never);
+  const batches = planAnchorBatched(day, heads as never, undefined, anchorNs(source));
   const records = heads.reduce((s, h) => s + h.recordCount, 0);
   const entries = batches.reduce((s, b) => s + b.entries.length, 0);
 

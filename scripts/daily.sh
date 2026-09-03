@@ -52,34 +52,38 @@ say "=== ancla daily start ==="
 say "seed source: $SEED_SOURCE"
 status=0
 
-say "--- mirror Panama"
-"$NODE" "$REPO/packages/ingest/src/cli.ts" mirror --source pa -c 4 >>"$LOG" 2>&1 \
-  || { say "panama mirror FAILED"; status=1; }
-
-# watch mirrors Costa Rica itself, then snapshots and diffs whatever moved.
-say "--- watch Costa Rica"
-"$NODE" "$REPO/packages/cli/src/main.ts" watch >>"$LOG" 2>&1
-watch_rc=$?
-if [ "$watch_rc" -eq 2 ]; then
-  say "FINDING: a closed month was rewritten with real changes"
-  status=2
-elif [ "$watch_rc" -ne 0 ]; then
-  say "watch FAILED rc=$watch_rc"
-  status=1
-fi
+# Costa Rica and Panama both have a schema, so both run the whole chain: watch
+# mirrors the source, snapshots whatever moved, and diffs it against the copy
+# held before. Honduras is left out on purpose — its certificate expired on
+# 2026-07-05 and an unattended job is the wrong place to decide to accept an
+# unauthenticated publisher. Add --source hn by hand when you mean it.
+for src in cr pa; do
+  say "--- watch $src"
+  "$NODE" "$REPO/packages/cli/src/main.ts" watch --source "$src" >>"$LOG" 2>&1
+  rc=$?
+  if [ "$rc" -eq 2 ]; then
+    say "FINDING ($src): a closed period was rewritten with real changes"
+    status=2
+  elif [ "$rc" -ne 0 ]; then
+    say "watch $src FAILED rc=$rc"
+    status=1
+  fi
+done
 
 # Broadcasting spends DCC and writes to a public chain, so it is opt-in through
 # the environment rather than on by default. Without it this still prints the
 # plan, which is what makes the dry run worth reading.
-say "--- anchor"
-if [ "${ANCLA_BROADCAST:-0}" = "1" ]; then
-  "$NODE" "$REPO/packages/cli/src/main.ts" anchor --broadcast >>"$LOG" 2>&1 \
-    || { say "anchor FAILED"; status=1; }
-else
-  "$NODE" "$REPO/packages/cli/src/main.ts" anchor >>"$LOG" 2>&1 \
-    || { say "anchor plan FAILED"; status=1; }
-  say "anchor was a dry run. set ANCLA_BROADCAST=1 to seal."
-fi
+for src in cr pa; do
+  say "--- anchor $src"
+  if [ "${ANCLA_BROADCAST:-0}" = "1" ]; then
+    "$NODE" "$REPO/packages/cli/src/main.ts" anchor --source "$src" --broadcast >>"$LOG" 2>&1 \
+      || { say "anchor $src FAILED"; status=1; }
+  else
+    "$NODE" "$REPO/packages/cli/src/main.ts" anchor --source "$src" >>"$LOG" 2>&1 \
+      || { say "anchor $src plan FAILED"; status=1; }
+  fi
+done
+[ "${ANCLA_BROADCAST:-0}" = "1" ] || say "anchors were dry runs. set ANCLA_BROADCAST=1 to seal."
 
 say "=== ancla daily end status=$status ==="
 exit "$status"

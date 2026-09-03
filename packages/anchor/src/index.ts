@@ -71,8 +71,11 @@ export function planAnchorBatched(
   day: string,
   snapshots: Snapshot[],
   maxEntries = MAX_ENTRIES,
+  ns?: string,
 ): AnchorPlan[] {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error('day must be YYYY-MM-DD');
+  if (ns && !/^[a-z]{2}$/.test(ns)) throw new Error('namespace must be a two-letter country code');
+  const p = nsPrefix(ns);
   const perBatch = Math.floor((maxEntries - 1) / 2);
   if (perBatch < 1) throw new Error('maxEntries too small to hold one month');
 
