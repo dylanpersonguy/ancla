@@ -1,5 +1,5 @@
 node_modules/
-dist/
+
 *.tsbuildinfo
 .DS_Store
 .env
@@ -14,3 +14,9 @@ data/
 # model. Lives next to the code for the team, never published. The public design
 # and the honest limits are in README.md.
 ANCLA_PLAN.md
+
+# The static export. Built from the mirror by `pnpm export`, and shipped to the
+# host as a build artifact rather than committed: it is derived data, it changes
+# every day, and a 22 MB changes file per republication does not belong in git
+# history. See Dockerfile.
+

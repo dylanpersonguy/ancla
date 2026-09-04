@@ -12,8 +12,21 @@
  * failure is legible rather than blank.
  */
 
+/**
+ * Where the API lives, relative to whatever directory this page was served from.
+ *
+ * Not a hardcoded "/api". The same files are served at the root of their own
+ * host and under /evidencia on decentralamerica.com, and an absolute path works
+ * in exactly one of those. Deriving it from the page's own location means the
+ * export is mountable anywhere without a build step or a config file, which is
+ * the property that lets anyone mirror it under a path of their choosing.
+ */
+function defaultApiBase() {
+  return `${location.pathname.replace(/[^/]*$/, "")}api`;
+}
+
 export const API =
-  new URLSearchParams(location.search).get("api") || globalThis.ANCLA_API || "/api";
+  new URLSearchParams(location.search).get("api") || globalThis.ANCLA_API || defaultApiBase();
 
 const OFFLINE = {
   es: "No se pudo contactar la API de Ancla. Vuelva a intentarlo en un momento.",

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
 <title>Ancla verifier</title>
 <style>
   :root {
@@ -51,6 +52,12 @@
     a read-only request to the public node.
   </p>
 
+  <div class="tabs" role="tablist">
+    <button id="tab-proof" class="tab" role="tab" aria-selected="true">Record proof</button>
+    <button id="tab-bundle" class="tab" role="tab" aria-selected="false">Diff bundle</button>
+  </div>
+
+  <section id="pane-proof">
   <h2>Proof</h2>
   <textarea id="proof" spellcheck="false"
     placeholder="Paste the JSON printed by: ancla prove YYYYMM Table id"></textarea>
@@ -64,6 +71,31 @@
   </div>
 
   <div id="result"></div>
+  </section>
+
+  <section id="pane-bundle" hidden>
+  <h2>Bundle manifest</h2>
+  <textarea id="manifest" spellcheck="false"
+    placeholder="Paste manifest.json from a bundle directory, or the output of: ancla bundle YYYYMM --json"></textarea>
+
+  <h2>Anchor account (optional)</h2>
+  <input id="baddr" spellcheck="false" placeholder="DecentralChain address holding the commitments" />
+
+  <div class="row">
+    <button id="bgo">Verify</button>
+  </div>
+
+  <div id="bresult"></div>
+
+  <p class="note">
+    This recomputes the bundle digest from the manifest and compares it with the
+    commitment on chain. A match proves the manifest was not edited after it was
+    published: the counts, both archive hashes and both Merkle roots are all inside
+    the digest. It does <em>not</em> prove the changes file is the one those two
+    archives produce. Only rebuilding from the archives does that, and only
+    <code>ancla verify-bundle</code> can, because it needs both files.
+  </p>
+  </section>
 
   <p class="note">
     A passing check proves the record matches the root that was committed, and that the
@@ -157,6 +189,150 @@ $("go").addEventListener("click", async () => {
     row("path length", p.proof.length + " steps over " + (p.leafCount ?? "?") + " leaves") +
     row("canonicalizer", p.canonVersion ?? "unstated") +
     row("source archive", p.archiveSha256 ?? "unstated") +
+    "</dl></div>");
+});
+
+// --------------------------------------------------------------- bundle mode
+
+// Must stay identical to digestInput() in packages/bundle/src/bundle.ts and to
+// apps/web/bundle-digest.js. This page has no build step and no imports by
+// design — it is one file a reader can save and run offline — so the code is
+// repeated here rather than shared, and apps/verifier/test/parity.test.ts pins
+// it against the Node implementation for exactly that reason.
+const DETAIL_ORDER = ["silentRevision", "removed", "reformatted", "recordedAmendment", "added"];
+
+// The canonicaliser is part of the chain key. Leaving it off reads the
+// commitment made under the previous rules and reports a healthy bundle as
+// tampered with.
+function canonSuffix(canonVersion) {
+  const m = /^ancla-canon-(\d+)$/.exec(canonVersion || "");
+  if (!m) throw new Error("unrecognised canonicaliser version: " + canonVersion);
+  return m[1] === "1" ? "" : "_c" + m[1];
+}
+
+function bundleSuffix(bundleVersion) {
+  const m = /^ancla-bundle-(\d+)$/.exec(bundleVersion || "");
+  if (!m) throw new Error("unrecognised bundle version: " + bundleVersion);
+  return m[1] === "1" ? "" : "_b" + m[1];
+}
+
+function diffChainKey(m) {
+  return "diff_" + m.period + "_" + m.from.archiveSha256.slice(0, 12) + "_" +
+         m.to.archiveSha256.slice(0, 12) + canonSuffix(m.canonVersion) +
+         bundleSuffix(m.bundleVersion);
+}
+
+function versionTuple(r) {
+  return [r.source, r.period, r.stamp, r.file, r.archiveSha256, r.merkleRoot, String(r.recordCount)];
+}
+
+const ALL_KINDS = ["added", "recordedAmendment", "silentRevision", "reformatted", "removed"];
+
+// Frozen. Two commitments were written under ancla-bundle-1 and a reader
+// checking one has to get the same answer they would have got that day.
+function digestInputV1(m) {
+  return JSON.stringify([
+    m.bundleVersion, m.canonVersion, m.source, m.period,
+    versionTuple(m.from), versionTuple(m.to),
+    DETAIL_ORDER.map((k) => [k, m.counts[k]]),
+    m.schemaChanges.map((s) => [s.table, s.before, s.after]),
+    m.changeCount,
+    [m.detailPolicy.maxDetail, m.detailPolicy.order],
+    m.valuesOmitted, m.changesSha256, m.canonVersionMismatch,
+  ]);
+}
+
+function digestInputV2(m) {
+  return JSON.stringify([
+    m.bundleVersion, m.canonVersion, m.source, m.period,
+    versionTuple(m.from), versionTuple(m.to),
+    DETAIL_ORDER.map((k) => [k, m.counts[k]]),
+    m.schemaChanges.map((s) => [s.table, s.before, s.after]),
+    m.changeCount,
+    ALL_KINDS.filter((k) => m.linePolicy.kinds.includes(k)),
+    m.omittedByPolicy,
+    [m.detailPolicy.maxDetail, m.detailPolicy.order],
+    m.valuesOmitted, m.changesSha256, m.canonVersionMismatch,
+  ]);
+}
+
+function digestInput(m) {
+  return m.bundleVersion === "ancla-bundle-1" ? digestInputV1(m) : digestInputV2(m);
+}
+
+async function bundleDigest(m) {
+  return hex(await sha256(new TextEncoder().encode(digestInput(m))));
+}
+
+async function chainValue(addr, key) {
+  const res = await fetch(NODE + "/addresses/data/" + addr + "/" + encodeURIComponent(key));
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("node returned HTTP " + res.status);
+  return String((await res.json()).value);
+}
+
+function switchTab(which) {
+  $("tab-proof").setAttribute("aria-selected", String(which === "proof"));
+  $("tab-bundle").setAttribute("aria-selected", String(which === "bundle"));
+  $("pane-proof").hidden = which !== "proof";
+  $("pane-bundle").hidden = which !== "bundle";
+}
+$("tab-proof").addEventListener("click", () => switchTab("proof"));
+$("tab-bundle").addEventListener("click", () => switchTab("bundle"));
+
+const brender = (html) => { $("bresult").innerHTML = html; };
+
+$("bgo").addEventListener("click", async () => {
+  let m;
+  try {
+    m = JSON.parse($("manifest").value);
+  } catch {
+    return brender('<div class="card"><div class="verdict bad">That is not valid JSON.</div></div>');
+  }
+  for (const f of ["bundleVersion", "canonVersion", "from", "to", "counts", "changesSha256", "bundleDigest"]) {
+    if (!(f in m)) {
+      return brender('<div class="card"><div class="verdict bad">Manifest is missing "' + f + '".</div></div>');
+    }
+  }
+
+  const computed = await bundleDigest(m);
+  const selfConsistent = computed === String(m.bundleDigest).toLowerCase();
+
+  let chain = "";
+  const addr = $("baddr").value.trim();
+  const key = diffChainKey(m);
+  if (addr) {
+    try {
+      const committed = await chainValue(addr, key);
+      if (committed === null) {
+        chain = '<div class="verdict warn">No commitment on chain for this pair of copies.</div>';
+      } else if (committed.toLowerCase() === computed) {
+        chain = '<div class="verdict ok">Matches the digest committed on chain.</div>';
+      } else {
+        chain = '<div class="verdict bad">Differs from the committed digest. This manifest was changed after publication.</div>';
+      }
+    } catch (e) {
+      chain = '<div class="verdict warn">Could not reach the node: ' + e.message + "</div>";
+    }
+  }
+
+  const c = m.counts;
+  brender('<div class="card"><div class="verdict ' + (selfConsistent ? "ok" : "bad") + '">' +
+    (selfConsistent
+      ? "Manifest reproduces its own digest."
+      : "Manifest does not reproduce the digest it states.") +
+    "</div>" + chain + "<dl>" +
+    row("period", m.period) +
+    row("earlier copy", m.from.stamp + " &middot; " + m.from.merkleRoot) +
+    row("later copy", m.to.stamp + " &middot; " + m.to.merkleRoot) +
+    row("recomputed digest", computed) +
+    row("stated digest", m.bundleDigest) +
+    row("changes sha256", m.changesSha256) +
+    row("chain key", key) +
+    row("silent revisions", c.silentRevision) +
+    row("removed", c.removed) +
+    row("added", c.added) +
+    row("canonicalizer", m.canonVersion + " / " + m.bundleVersion) +
     "</dl></div>");
 });
 

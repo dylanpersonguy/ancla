@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
     <title>Verificar · Ancla</title>
     <meta
       name="description"
@@ -22,9 +23,11 @@
         <a class="wordmark" href="./index.html">Ancla</a>
         <nav>
           <a href="./index.html" data-t="nav.changes">Cambios</a>
+          <a href="./versions.html" data-t="nav.versions">Versiones</a>
           <a href="./verify.html" aria-current="page" data-t="nav.verify">Verificar</a>
-          <a href="/api" data-t="nav.api">API</a>
+          <a href="./api" data-t="nav.api">API</a>
         </nav>
+        <a class="upsite" href="https://decentralamerica.com/">DecentralAmerica</a>
         <div class="langs" role="group" data-t-title="lang.switch">
           <button type="button" data-lang="es">ES</button>
           <button type="button" data-lang="en">EN</button>
@@ -41,8 +44,8 @@
         <p class="lede" data-t="verify.intro"></p>
       </div>
 
-      <h2 data-t="verify.lookup">Buscar por número de procedimiento</h2>
-      <p class="note" data-t="verify.lookup.hint"></p>
+      <h2 id="verify-lookup-head" data-t="verify.lookup">Buscar por número de procedimiento</h2>
+      <p class="note" id="verify-lookup-hint" data-t="verify.lookup.hint"></p>
       <form class="filters" id="lookup">
         <div class="field">
           <label for="l-sicop" data-t="verify.lookup.id"></label>
@@ -86,6 +89,7 @@
       <div class="footer-inner">
         <p data-t="note.sourceIsSicop"></p>
         <p class="mono" id="anchor-line"></p>
+        <p><a class="upsite" href="https://decentralamerica.com/">DecentralAmerica</a></p>
       </div>
     </footer>
 

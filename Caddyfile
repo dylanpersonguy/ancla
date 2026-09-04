@@ -1,0 +1,75 @@
+# Serves the static evidence export.
+#
+# The whole site is files on disk: no server, no database, no volume. That is a
+# deliberate property rather than a shortcut. A static site cannot answer one
+# reader differently from another, cannot be induced to fall over, and can be
+# mirrored in full by anyone who would rather not trust us — which for a project
+# whose claim is "check it yourself" is the point.
+#
+# Nothing here is a trust dependency either way: every page recomputes its
+# digests in the reader's browser and reads the commitments straight off a public
+# DecentralChain node, not through this host.
+
+{
+	admin off
+	# Railway terminates TLS at its edge and forwards plain HTTP.
+	auto_https off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:{$PORT:8080} {
+	root * /srv
+	# Already-compressed artifacts are left alone; everything else is worth it.
+	@compressible not path *.gz
+	encode @compressible zstd gzip
+
+	header {
+		# No inline script, no third-party origin except the fonts the page uses
+		# and the public node it reads commitments from.
+		Content-Security-Policy "default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://mainnet-node.decentralchain.io; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+	}
+
+	# The export writes each API response as `<path>/index`, because a path cannot
+	# be both a response and the parent of one: /api/bundles is a listing and also
+	# the parent of /api/bundles/202608/... So the URL a reader uses is the same
+	# one the live API serves, and the file behind it is one level down.
+	# `/api` as well as `/api/*`: the root listing has no trailing segment, and a
+	# bare /api/* matcher does not match it.
+	@api path /api /api/*
+	handle @api {
+		header Access-Control-Allow-Origin "*"
+		# Point-in-time data. Short cache so a redeploy is visible quickly.
+		header Cache-Control "public, max-age=300"
+
+		# The whole changes artifact is served as the gzip file it is, not as a
+		# transfer encoding: a reader downloading it to check the digest must get
+		# the same bytes the digest was taken over, and Content-Encoding would let
+		# the browser decompress it on the way in.
+		@gz path *.gz
+		header @gz Content-Type "application/gzip"
+
+		@json not path *.gz
+		header @json Content-Type "application/json; charset=utf-8"
+
+		# The index form comes first: /api/versions is a directory holding the
+		# response, so matching the directory itself would 404 on a listing.
+		try_files {path}/index {path}
+		file_server
+	}
+
+	handle {
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+
+	handle_errors {
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}

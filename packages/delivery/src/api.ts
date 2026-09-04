@@ -25,17 +25,29 @@
  *   /suppliers/:cedula             one supplier's participation
  *   /institutions/:cedula          one institution's procedures
  *   /proof/:month/:table/:id       the Merkle proof the verifier consumes
+ *   /versions[/:period]            every copy held, and whether it is anchored
+ *   /bundles[/:period]             published row-level diffs
+ *   /bundles/:period/:pair         one bundle's manifest
+ *   /bundles/:period/:pair/fields  which fields moved, and how
+ *   /bundles/:period/:pair/changes a page of that bundle's changed rows
+ *   /recovery                      what can still be recovered, and what cannot
  *   /ocds/:month                   an OCDS 1.1 release package
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { chainSnapshot, anchorAddress, anchorNode } from './chain.ts';
 import {
+  bundleChanges,
+  bundleFields,
+  bundleManifest,
+  bundleSummaries,
+  captures,
   count,
   feed,
   index,
   monthVersions,
   proofFor,
+  recovery,
   reportSummaries,
   rows,
   storedMonths,
@@ -500,8 +512,107 @@ const ROUTES: Record<string, Handler> = {
   suppliers: supplier,
   institutions: institution,
   proof,
+  versions,
+  bundles,
+  recovery: recoveryRoute,
   ocds,
 };
+
+
+// ---------------------------------------------------------------------------
+// Versions, bundles and recovery
+// ---------------------------------------------------------------------------
+
+/**
+ * A bundle directory name: two archive stamps joined by a double underscore, and
+ * for anything past the first canonicaliser, the version that built it.
+ */
+const PAIR_RE = /^\d{8}T\d{6}Z__\d{8}T\d{6}Z(__ancla-canon-\d+)?$/;
+
+async function versions(ctx: Ctx): Promise<void> {
+  const period = ctx.segments[1];
+  if (period && !MONTH_RE.test(period)) return fail(ctx, 400, 'bad_month', 'error.badMonth');
+  const chain = await chainSnapshot();
+  const list = await captures(period);
+  if (period && !list.length) {
+    return fail(ctx, 404, 'no_month', 'error.notFound', { what: period });
+  }
+  sendJson(ctx.res, 200, {
+    anchor: { address: chain.address, node: chain.node, reachable: chain.reachable },
+    // Absence of a commitment and inability to read the chain are different
+    // answers, and a page that renders them the same way is lying by omission.
+    anchorStateKnown: chain.reachable,
+    // `path` is dropped: it is where the file sits on our disk, which is not the
+    // reader's business and is the kind of thing that ends up in a bug report.
+    captures: list.map(({ path: _path, ...rest }) => rest),
+  });
+}
+
+async function bundles(ctx: Ctx): Promise<void> {
+  const [, period, pair, tail] = ctx.segments;
+  if (period && !MONTH_RE.test(period)) return fail(ctx, 400, 'bad_month', 'error.badMonth');
+
+  if (!pair) {
+    sendJson(ctx.res, 200, { bundles: await bundleSummaries(period) });
+    return;
+  }
+  if (!PAIR_RE.test(pair)) return fail(ctx, 400, 'bad_pair', 'error.notFound', { what: pair });
+
+  if (!tail) {
+    const m = await bundleManifest(period as string, pair);
+    if (!m) return fail(ctx, 404, 'no_bundle', 'error.notFound', { what: `${period}/${pair}` });
+    const chain = await chainSnapshot();
+    const onChain =
+      chain.diffs.find(
+        (d) =>
+          d.period === m.period &&
+          d.canonVersion === m.canonVersion &&
+          d.fromId === m.from.archiveSha256.slice(0, 12) &&
+          d.toId === m.to.archiveSha256.slice(0, 12),
+      ) ?? null;
+    sendJson(ctx.res, 200, {
+      manifest: m,
+      onChain,
+      digestMatches: onChain ? onChain.bundleDigest === m.bundleDigest : null,
+      anchorStateKnown: chain.reachable,
+    });
+    return;
+  }
+
+  if (tail === 'fields') {
+    const summary = await bundleFields(period as string, pair);
+    if (!summary) return fail(ctx, 404, 'no_bundle', 'error.notFound', { what: `${period}/${pair}` });
+    sendJson(ctx.res, 200, { period, pair, ...summary });
+    return;
+  }
+
+  if (tail !== 'changes') {
+    return fail(ctx, 404, 'not_found', 'error.notFound', { what: tail });
+  }
+  const q = ctx.url.searchParams;
+  const page = await bundleChanges(period as string, pair, {
+    limit: num(q.get('limit'), 100),
+    offset: num(q.get('offset'), 0),
+    kind: q.get('kind'),
+    table: q.get('table'),
+    field: q.get('field'),
+    numeric: q.get('numeric') === '1',
+    readable: q.get('readable') === '1',
+  });
+  if (!page) return fail(ctx, 404, 'no_bundle', 'error.notFound', { what: `${period}/${pair}` });
+  sendJson(ctx.res, 200, { period, pair, ...page });
+}
+
+async function recoveryRoute(ctx: Ctx): Promise<void> {
+  const chain = await chainSnapshot();
+  sendJson(ctx.res, 200, {
+    anchorStateKnown: chain.reachable,
+    // Stated in the payload because the classification depends on it: without the
+    // chain, "nothing earlier exists" is really "nothing earlier is on this disk".
+    caveat: chain.reachable ? null : 'chain unreachable; currentOnly may be priorAnchored',
+    inventory: await recovery(),
+  });
+}
 
 /**
  * A request handler that returns false when nothing matched, so the same routes can

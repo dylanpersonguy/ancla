@@ -92,10 +92,11 @@ async function fillMonths() {
   const chosen = select.value;
   select.replaceChildren(el("option", { value: "" }, t("common.unknown")));
   try {
-    const data = await api("/months");
-    for (const m of data.months.slice().reverse()) {
-      select.append(el("option", { value: m.month }, m.month));
-    }
+    // /months belongs to the server build. The static export publishes every
+    // capture instead, and the months are the distinct periods in it.
+    const data = await api("/versions");
+    const months = [...new Set((data.captures ?? []).map((c) => c.period))].sort().reverse();
+    for (const month of months) select.append(el("option", { value: month }, month));
   } catch {
     /* without the API the month has to be typed into the proof by hand */
   }
@@ -231,12 +232,27 @@ async function render() {
   await fillMonths();
   applyMessages();
   try {
-    const health = await api("/health");
-    $("addr").value ||= health.chain.address ?? "";
-    $("node").value ||= health.chain.node ?? DEFAULT_NODE;
-    $("anchor-line").textContent = `${t("anchor.account")} ${health.chain.address} · ${t(
-      "anchor.node",
-    )} ${health.chain.node} · ${t("anchor.height")} ${health.chain.height ?? "-"}`;
+    // The index answers on both builds: the server serves it and the static
+    // export writes it. /health is server-only, and asking for it on a static
+    // deploy put "could not contact the API" above a page whose verification
+    // never needed an API in the first place — every hash is recomputed here and
+    // the root is read straight off the public node.
+    const index = await api("/");
+    const anchor = index.anchor ?? {};
+    $("addr").value ||= anchor.address ?? "";
+    $("node").value ||= anchor.node ?? DEFAULT_NODE;
+    $("anchor-line").textContent =
+      `${t("anchor.account")} ${anchor.address} · ${t("anchor.node")} ${anchor.node}` +
+      (index.chain?.height ? ` · ${t("anchor.height")} ${index.chain.height}` : "");
+
+    // /proof and /tenders exist only on the server build. On the static export
+    // the lookup form can never return anything, so it is removed rather than
+    // left as a button that always fails. Pasting a proof still works, and that
+    // is the path this page is actually about.
+    if (index.static) {
+      for (const id of ["verify-lookup-head", "verify-lookup-hint"]) $(id)?.remove();
+      $("lookup")?.remove();
+    }
   } catch {
     $("node").value ||= DEFAULT_NODE;
     banner(offlineMessage());

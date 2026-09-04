@@ -24,8 +24,23 @@ import { leafFor, readSnapshot, type Snapshot } from '../../canonicalize/src/sna
 import { proof as merkleProof } from '../../merkle/src/index.ts';
 import type { Change, ChangeKind } from '../../differ/src/index.ts';
 import type { WatchReport } from '../../cli/src/watch.ts';
-import { archives, months, snapshotPath } from '../../cli/src/store.ts';
+import { archives, months, snapshotsFor } from '../../cli/src/store.ts';
+import { listBundles, loadBundle } from '../../cli/src/bundles.ts';
+import { hasSchema } from '../../cli/src/schemas.ts';
+import type { Source } from '../../ingest/src/source.ts';
+import { SOURCES } from '../../ingest/src/sources.ts';
+import { allCaptures, capturesFor, recoveryInventory } from '../../cli/src/versions.ts';
+import type { BundleLine, BundleManifest } from '../../bundle/src/bundle.ts';
+import { parseChanges } from '../../bundle/src/bundle.ts';
+import {
+  type BundleSummary,
+  classifyMovement,
+  decimalDelta,
+  hasNumericMove,
+  summarizeBundle,
+} from '../../bundle/src/summary.ts';
 import { dataRoot } from '../../ingest/src/manifest.ts';
+import { chainSnapshot } from './chain.ts';
 
 export type { Db };
 
@@ -114,14 +129,22 @@ export async function loadMonth(month: string): Promise<LoadedSnapshot | null> {
   const refs = await archives(month);
   if (!refs.length) return null;
   const ref = refs[refs.length - 1];
-  let snapshot: Snapshot;
-  try {
-    snapshot = await readSnapshot(snapshotPath(ref));
-  } catch {
-    // The archive is mirrored but not yet canonicalized. Building it here would
-    // block the event loop for minutes, so report absence instead.
-    return null;
+  // Current rules first, then any older canonicalisation still on disk. A site
+  // pointed at a data directory that predates a canonicaliser bump should serve
+  // the proofs it can rather than go blank: those proofs check against the roots
+  // anchored under those same rules, and every response names its version.
+  let snapshot: Snapshot | null = null;
+  for (const { path } of await snapshotsFor(ref)) {
+    try {
+      snapshot = await readSnapshot(path);
+      break;
+    } catch {
+      /* unreadable under these rules; try the next */
+    }
   }
+  // The archive is mirrored but not yet canonicalized. Building it here would
+  // block the event loop for minutes, so report absence instead.
+  if (!snapshot) return null;
   const leaves = snapshot.records.map(leafFor);
   const positions = new Map<string, number>();
   for (let i = 0; i < snapshot.records.length; i++) {
@@ -213,7 +236,9 @@ export function reportsDir(): string {
 export async function listReports(): Promise<string[]> {
   try {
     return (await readdir(reportsDir()))
-      .filter((f) => /^watch-\d{4}-\d{2}-\d{2}\.json$/.test(f))
+      // `watch-<day>.json` is Costa Rica; `watch-<day>-<source>.json` is anyone
+      // else. Both are reports and both belong in the feed.
+      .filter((f) => /^watch-\d{4}-\d{2}-\d{2}(-[a-z0-9-]+)?\.json$/.test(f))
       .sort();
   } catch {
     return [];
@@ -301,4 +326,225 @@ export async function reportSummaries(): Promise<
     });
   }
   return out.reverse();
+}
+
+// ---------------------------------------------------------------------------
+// Captures, bundles and what cannot be recovered
+// ---------------------------------------------------------------------------
+
+/**
+ * The version surface. The rest of the API answers "what does the record say";
+ * these answer "which copy of the record, and what did the copy before it say".
+ *
+ * Everything here reads the same files the CLI writes, so the site is a view of
+ * the evidence and never a second source of it. A reader who does not trust the
+ * site can run the same commands and get the same bytes.
+ */
+/**
+ * Every publisher whose archives can become records.
+ *
+ * A source with no canonicalisation schema is deliberately absent: its archives
+ * are mirrored and hashed, but they cannot be turned into rows, so there is
+ * nothing for a version browser to show beyond a file size. Honduras is in that
+ * state and showing it as if it were Costa Rica would be a claim we cannot back.
+ */
+export function anchoredSources(): Source[] {
+  return SOURCES.filter((s) => hasSchema(s.id));
+}
+
+/**
+ * Captures across every anchored publisher, not just the first one.
+ *
+ * This used to default to Costa Rica everywhere, which meant Panamá ran the whole
+ * pipeline daily — mirrored, canonicalised, 37 roots on chain — and appeared
+ * nowhere on the site that exists to show it. Each capture already carries its
+ * `source`, so the API returns them all and the page filters.
+ */
+export async function captures(period?: string) {
+  const chain = await chainSnapshot();
+  const out = [];
+  for (const source of anchoredSources()) {
+    out.push(
+      ...(period
+        ? await capturesFor(period, source, chain.versions)
+        : await allCaptures(source, chain.versions)),
+    );
+  }
+  return out;
+}
+
+export async function recovery() {
+  const chain = await chainSnapshot();
+  const out = [];
+  for (const source of anchoredSources()) {
+    out.push(...(await recoveryInventory(source, chain.versions)));
+  }
+  return out;
+}
+
+export type BundleSummary = {
+  source: string;
+  period: string;
+  pair: string;
+  from: BundleManifest['from'];
+  to: BundleManifest['to'];
+  counts: BundleManifest['counts'];
+  changeCount: number;
+  valuesOmitted: number;
+  bundleDigest: string;
+  changesSha256: string;
+  canonVersion: string;
+  bundleVersion: string;
+  builtAt: string;
+};
+
+function summarise(period: string, pair: string, m: BundleManifest): BundleSummary {
+  return {
+    source: m.source,
+    period,
+    pair,
+    from: m.from,
+    to: m.to,
+    counts: m.counts,
+    changeCount: m.changeCount,
+    valuesOmitted: m.valuesOmitted,
+    bundleDigest: m.bundleDigest,
+    changesSha256: m.changesSha256,
+    canonVersion: m.canonVersion,
+    bundleVersion: m.bundleVersion,
+    builtAt: m.builtAt,
+  };
+}
+
+async function allStoredBundles() {
+  const out = [];
+  for (const source of anchoredSources()) out.push(...(await listBundles(source)));
+  return out;
+}
+
+export async function bundleSummaries(period?: string): Promise<BundleSummary[]> {
+  return (await allStoredBundles())
+    .filter((b) => !period || b.period === period)
+    .map((b) => summarise(b.period, b.pair, b.manifest));
+}
+
+export async function bundleManifest(
+  period: string,
+  pair: string,
+): Promise<BundleManifest | null> {
+  const hit = (await allStoredBundles()).find((b) => b.period === period && b.pair === pair);
+  return hit ? hit.manifest : null;
+}
+
+/**
+ * A page of a bundle's changes.
+ *
+ * Read from disk on each request rather than cached: a bundle is tens of
+ * megabytes and there is no reason for a public read path to hold one resident.
+ * Filtering happens after parsing because the file is JSONL, not an index — for
+ * a closed-month rewrite that is a few thousand lines, and for the open month
+ * the caller should be paging anyway.
+ */
+/**
+ * One parsed bundle stays resident, the rest are read on demand.
+ *
+ * Parsing 278,691 JSON lines takes a couple of seconds, and a reader paging
+ * through a bundle asks for the same one repeatedly. Same policy as the snapshot
+ * cache above and for the same reason: cache exactly one, because two is a memory
+ * budget nobody set.
+ */
+let bundleCache: { dir: string; lines: BundleLine[]; summary: BundleSummary } | null = null;
+
+async function parsed(period: string, pair: string) {
+  const hit = (await allStoredBundles()).find((b) => b.period === period && b.pair === pair);
+  if (!hit) return null;
+  if (bundleCache?.dir !== hit.dir) {
+    const { changes } = await loadBundle(hit.dir);
+    const lines = parseChanges(changes);
+    bundleCache = { dir: hit.dir, lines, summary: summarizeBundle(lines) };
+  }
+  return { manifest: hit.manifest, ...bundleCache };
+}
+
+export function dropBundleCache(): void {
+  bundleCache = null;
+}
+
+/**
+ * Which fields moved, and how. This is the view that makes a bundle readable:
+ * a flat list cannot distinguish six thousand rows of a date being filled in
+ * from twelve rows where an amount changed.
+ */
+export async function bundleFields(
+  period: string,
+  pair: string,
+): Promise<(BundleSummary & { changeCount: number; valuesOmitted: number }) | null> {
+  const p = await parsed(period, pair);
+  if (!p) return null;
+  return { ...p.summary, changeCount: p.manifest.changeCount, valuesOmitted: p.manifest.valuesOmitted };
+}
+
+export type ChangeFilter = {
+  limit?: number;
+  offset?: number;
+  kind?: string | null;
+  table?: string | null;
+  field?: string | null;
+  /** Only rows where some field moved as a number. Reprints do not count. */
+  numeric?: boolean;
+  /**
+   * Every row worth reading, unpaged: anything that carries values and is not a
+   * plain addition.
+   *
+   * This is what the page actually consumes, and it exists so the page behaves
+   * identically against a live API and against a static export. Filtering and
+   * paging then happen in the browser over one payload, which removes a whole
+   * class of divergence between the two. For 202608 it is 13,199 rows and 1.9 MB
+   * over the wire, against 259,891 rows and 22 MB for the whole file — because a
+   * new record's evidence is the archive, and we keep the archive.
+   */
+  readable?: boolean;
+};
+
+/** Attach how each field moved. Derived, so it stays outside the bundle digest. */
+function withMovement(l: BundleLine): BundleLine {
+  if (!l.fields) return l;
+  return {
+    ...l,
+    fields: l.fields.map((f) => ({
+      ...f,
+      movement: classifyMovement(f.before, f.after),
+      delta: decimalDelta(f.before, f.after),
+    })),
+  };
+}
+
+/**
+ * A page of changes, with the per-field movement attached.
+ *
+ * The movement and the delta are computed here rather than stored, so they stay
+ * outside the bundle digest and anyone can recompute them from the same file.
+ */
+export async function bundleChanges(
+  period: string,
+  pair: string,
+  opts: ChangeFilter = {},
+): Promise<{ total: number; matched: number; changes: BundleLine[] } | null> {
+  const p = await parsed(period, pair);
+  if (!p) return null;
+  if (opts.readable) {
+    const rows = p.lines.filter((l) => !l.valuesOmitted && l.kind !== 'added');
+    return { total: p.lines.length, matched: rows.length, changes: rows.map(withMovement) };
+  }
+  const matched = p.lines.filter(
+    (l) =>
+      (!opts.kind || l.kind === opts.kind) &&
+      (!opts.table || l.table === opts.table) &&
+      (!opts.field || (l.fields ?? []).some((f) => f.field === opts.field)) &&
+      (!opts.numeric || hasNumericMove(l)),
+  );
+  const offset = Math.max(0, opts.offset ?? 0);
+  const limit = Math.min(Math.max(1, opts.limit ?? 100), 1000);
+  const page = matched.slice(offset, offset + limit).map(withMovement);
+  return { total: p.lines.length, matched: matched.length, changes: page };
 }

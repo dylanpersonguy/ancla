@@ -11,10 +11,15 @@
  * reach the chain" is to say so, not to serve a blank page.
  */
 
-import { DEFAULT_NODE, nodeUrl } from '../../anchor/src/client.ts';
+import { DEFAULT_ANCHOR_ADDRESS, DEFAULT_NODE, nodeUrl } from '../../anchor/src/client.ts';
+import {
+  type AnchoredDiff,
+  type AnchoredVersion,
+  groupVersionEntries,
+} from '../../anchor/src/versions.ts';
 
 /** The account that has been anchoring since the first transaction. */
-export const DEFAULT_ANCHOR_ADDRESS = '3DTwG5ZydbJDuLdEmwfgDEH3NuwDrgwQFtF';
+export { DEFAULT_ANCHOR_ADDRESS };
 
 export function anchorAddress(): string {
   return process.env.ANCLA_ANCHOR_ADDRESS ?? DEFAULT_ANCHOR_ADDRESS;
@@ -47,6 +52,12 @@ export type ChainSnapshot = {
   /** The day the anchor job last wrote, as the account itself records it. */
   latest: string | null;
   days: AnchorDay[];
+  /**
+   * Commitments addressed by the bytes they describe rather than by the day the
+   * job ran: one per capture, one per published diff. See anchor/versions.ts.
+   */
+  versions: AnchoredVersion[];
+  diffs: AnchoredDiff[];
   error?: string;
   fetchedAt: string;
 };
@@ -125,6 +136,8 @@ export async function chainSnapshot(force = false): Promise<ChainSnapshot> {
     height: null,
     latest: null,
     days: [],
+    versions: [],
+    diffs: [],
     fetchedAt: new Date().toISOString(),
   };
   try {
@@ -133,12 +146,15 @@ export async function chainSnapshot(force = false): Promise<ChainSnapshot> {
       getJson<{ height: number }>(`${node}/blocks/height`, 8000).catch(() => ({ height: 0 })),
     ]);
     const { latest, days } = groupEntries(entries);
+    const { versions, diffs } = groupVersionEntries(entries);
     const value: ChainSnapshot = {
       ...base,
       reachable: true,
       height: h.height || null,
       latest,
       days,
+      versions,
+      diffs,
     };
     cache = { at: Date.now(), value };
     return value;

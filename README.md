@@ -36,7 +36,10 @@ those will have innocent explanations too.
 It **cannot audit the past**. Anchoring establishes integrity from the day it starts.
 Five republication events between 2024 and 2026 rewrote 14 closed months, and what
 those files said beforehand is permanently unknowable. Any system claiming otherwise
-is comparing a hash against one it generated itself, which proves nothing.
+is comparing a hash against one it generated itself, which proves nothing. `ancla
+recover` prints that gap period by period rather than papering over it, and will keep
+saying `currentOnly` for all fourteen until somebody produces a copy that reproduces
+a root committed before they offered it.
 
 It only sees **what gets published**. Contracts that never entered SICOP are
 invisible. The Contraloría found 27.1% of awarded value in 2021 flowed outside the
@@ -50,22 +53,24 @@ that only records presence.
 | Component | State |
 |---|---|
 | Historical mirror | 189 archives, 3.04 GB, complete |
-| Canonicalization and Merkle proofs | working, version `ancla-canon-1` |
+| Canonicalization and Merkle proofs | working, version `ancla-canon-2` |
 | Change detection | working, tested against real archives |
-| Daily watch job | working, **not yet scheduled** |
-| Anchoring to mainnet | **live**, one root committed |
+| Row-level evidence bundles | working, version `ancla-bundle-2`, with a field-level summary |
+| Per-capture and per-diff commitments | working, keyed by content, not by day |
+| Daily watch job | **live**, launchd, 09:30 local |
+| Anchoring to mainnet | **live**, 420 capture commitments: 228 under `ancla-canon-1`, 192 under `-2` |
 | Longitudinal index | 189 months, ~6 million rows |
 | Entity resolution | 72,105 resolved actors |
 | Analytics and integrity screens | working |
 | REST API, OCDS export, alerts | working |
-| Spanish web app and public verifier | working, not yet hosted |
-| Tests | 306 passing across 22 files |
+| Spanish web app and public verifier | **live** at decentralamerica.com/evidencia |
+| Tests | 409 passing across 36 files, plus 12 real-data tests that skip without a mirror |
 
-Two honest gaps. The daily anchor is currently run by hand, so the chain holds one
-root rather than a daily series; scheduling it is the single most important operational
-task in this repo. And change detection has not yet caught a live rewrite, because
-none has occurred since the mirror was taken. Based on the record, that happens about
-twice a year.
+One honest gap. Change detection has not yet caught a rewrite of a *closed*
+month, because none has occurred since the mirror was taken. Based on the record that
+happens about twice a year, and the bundle machinery is exercised in the meantime
+against the two copies of 202608 the publisher actually served five days apart:
+259,891 classified changes, rebuilt byte for byte from the archives by a second pass.
 
 ---
 
@@ -162,13 +167,15 @@ rewriting the record, which is the one thing this project claims to detect.
               |
    3. merkle              fold ~1.4M records into one 64-character root
               |
-   4. anchor              write the root to DecentralChain
+   4. bundle              what changed between two copies, field by field
               |
-   5. index               stitch all 189 months into one SQL history
+   5. anchor              write the root, and the bundle digest, to DecentralChain
               |
-   6. analyse             competition, duration, price, collusion screens
+   6. index               stitch all 189 months into one SQL history
               |
-   7. deliver             REST API, OCDS, alerts, web, verifier
+   7. analyse             competition, duration, price, collusion screens
+              |
+   8. deliver             REST API, OCDS, alerts, web, verifier
 ```
 
 ### Ingest keeps everything and overwrites nothing
@@ -206,6 +213,10 @@ than buried, and there is now a test pinning that exact case.
 version would silently invalidate every commitment made before, which is the one
 failure this project cannot survive. Released versions are never modified.
 
+It has moved once, on 2026-09-03, to `ancla-canon-2`. See **The publisher writes
+broken CSV** below for why, and *What a version bump costs* for what it did to the
+228 commitments already on chain.
+
 ### Merkle trees follow RFC 6962
 
 The Certificate Transparency construction, not the Bitcoin one. Leaves and internal
@@ -235,6 +246,206 @@ There is deliberately **no on-chain proof verification**: proofs are checked
 client-side against the node's REST API, so the contract cannot be the thing that
 breaks, and a lawyer can be walked through all of it.
 
+### Every capture is committed, not just every day
+
+The daily plan writes `root_<day>_<period>`, which is addressed by the day the job
+ran. That is enough to prove the record changed, and it has one hole: a copy that
+arrives and is replaced between two runs is never committed to, and a day the job
+misses takes that copy's root with it. The bytes survive on disk either way. What is
+lost is the ability to prove afterwards that they are the bytes we had, which is the
+half that matters.
+
+So each capture also gets a key derived from its own bytes:
+
+```
+ver_202608_2a8f44f57e6b    = 77c30fc86e5bf2c69f1f36e8dce61b39a06a23470a3a9396b79627a2b9d56734
+vmeta_202608_2a8f44f57e6b  = ancla-canon-1|1652192|2a8f44f57e6b99a2…|20260831T130427Z
+```
+
+The twelve hex are the front of the archive's SHA-256, so the same copy always lands
+on the same key with the same value. Anchoring it twice is a no-op the contract
+refuses rather than a rewrite, and two different copies cannot collide onto one key
+without a SHA-256 collision. `ancla anchor --versions` drops keys already on chain
+before signing, so a quiet day costs nothing.
+
+### What a version bump costs
+
+Changing the canonicaliser is the most expensive thing this project can do, so it is
+worth being exact about what it does and does not invalidate.
+
+**The archives are untouched.** They are the evidence. Every `archiveSha256` on chain
+still describes the same bytes, and a v1 root is still reproducible from those bytes
+by v1 code, which is in this history.
+
+**A v1 root and a v2 root describe different record sets.** Not because the file
+changed but because v1 merged rows that v2 keeps apart. So they cannot be compared,
+and nothing tries to: `vmeta` carries the canon version, the differ refuses a
+cross-version comparison, and a capture anchored under v1 renders as anchored under
+v1 rather than as missing.
+
+**A capture needs one key per version.** The chain key is derived from the archive's
+hash, which does not change when the rules do — so a v2 root would land on the key
+its v1 root already occupies, the contract would refuse to overwrite it (correctly),
+and the anchor step would skip that capture forever. Keys therefore carry the
+canonicaliser:
+
+```
+ver_202608_2a8f44f57e6b      ancla-canon-1, already on chain, unsuffixed
+ver_202608_2a8f44f57e6b_c2   ancla-canon-2
+```
+
+**Snapshots too.** They used to be named for the archive alone, so re-snapshotting
+would have overwritten the file each anchored v1 root was built from. They now carry
+their version, and the old unsuffixed path is still read so nothing already built is
+orphaned.
+
+**Re-anchoring is a deliberate act, not a migration step.** The 228 v1 commitments
+stay exactly where they are and stay true. Committing the v2 roots is a separate
+decision with its own cost, and `ancla anchor --versions` will show it as a plan
+before it sends anything.
+
+### A bundle says what changed, not just that something did
+
+A root proves a file moved. It cannot say which contract moved, and that is the only
+question a journalist or an auditor actually has. So a republication also produces an
+**evidence bundle**: a directory holding a manifest and one line per changed row.
+
+```
+bundles/202608/20260826T130636Z__20260831T130427Z/
+  manifest.json       both versions, both roots, the five counts, two digests
+  changes.jsonl.gz    one line per change, with old and new values
+```
+
+A silent revision names the field and both sides of it:
+
+```json
+{"kind":"silentRevision","table":"Contratos","id":"CE202608001300|00",
+ "fields":[{"field":"FECHA_NOTIFICACION","before":"","after":"2026-08-27 00:00:00.0000000"}]}
+```
+
+A removal keeps the whole row, because nothing else will. An addition keeps the row
+that appeared. The reformatted class still exists here and is still separate from a
+revision, for the same reason it is separate in the differ.
+
+**The bundle digest is what goes on chain**, under a key naming both copies:
+
+```
+diff_202608_7cc3a068c019_2a8f44f57e6b_c2  = 9100885e298fab7990b990672853390d…
+dmeta_202608_7cc3a068c019_2a8f44f57e6b_c2 = ancla-bundle-1|246692,24,7592,1905,3678|08612c90…
+```
+
+The `_c2` names the canonicaliser; a `_b2` after it would name the bundle format.
+Both are absent for the first version of each, because commitments exist under
+those unsuffixed names and renaming them would orphan every one.
+
+That digest covers both archive hashes, both Merkle roots, every count, the schema
+changes and the hash of the changes file. It deliberately does **not** cover
+`builtAt`, so two machines holding the same two archives produce the same digest.
+That is the whole claim, and `ancla verify-bundle` is that claim as an executable
+check: it rebuilds the bundle from the two ZIPs and compares byte for byte.
+
+The chain still stores no procurement data. It stores a commitment to a file anyone
+can rebuild.
+
+**Which fields moved.** A list of thousands of rows is not an answer to anything, so
+a bundle also answers the first question anyone asks. Derived from the changes file
+rather than stored in it, so it is outside the digest and anyone can recompute it:
+
+```
+  7,382  OrdenPedido       ESTADO_ORDEN                7,382 text changed
+  5,756  OrdenPedido       FECHA_PROV_RECIBE_ORDEN     5,756 filled in
+    117  OrdenPedido       TOTAL_ORDEN                   117 number moved   ↑69 ↓48
+     75  ReajustePrecios   MONTO_TOTAL                    75 number moved   ↑40 ↓35
+```
+
+Fifteen thousand rows of dates being filled in is a batch job. A hundred and
+seventeen rows where an amount moved is a question. They look identical in a flat
+list, and the distinction is what the page leads with.
+
+A value that was reprinted rather than changed — `1.000` becoming `1` — is counted
+as a reprint, not as an amount change, for the same reason `byteHash` is kept apart
+from `valueHash`. A field summary that reports 1,905 reprints as 1,905 amount changes
+is the headline this project exists not to produce.
+
+**On size.** A rewritten closed month moves tens of rows and every one fits. The
+open month's daily update moves a quarter of a million, because the month is
+filling up, which is not news. Writing every field of every one would spend nine
+gigabytes a year to record that August grew during August, and bury the fifteen
+hundred rows that were quietly edited or withdrawn under a quarter of a million
+that nobody will ask about.
+
+Two separate mechanisms handle that, and the difference between them matters:
+
+| | drops | recorded as |
+|---|---|---|
+| detail budget | the *values* on a line that is still there | `valuesOmitted` |
+| line policy | the *line* | `omittedByPolicy`, plus the policy itself |
+
+Both are inside the digest. A closed month is written in full; the open month gets
+`REVISIONS_ONLY`, which lists the revisions, withdrawals and reprints and leaves
+additions counted but not enumerated — their evidence is the archive, and the
+archive is kept. `counts` always covers every change either way, so the manifest
+still says 246,692 records were added; it just does not list them. The arithmetic
+is checked: written lines plus policy omissions must equal every change the diff
+found, and a kind the policy excluded must have no lines at all.
+
+That is what moved the format to `ancla-bundle-2`. `digestInputV1` is frozen and
+reached by dispatch on a manifest's own version, so the two commitments already
+written under `ancla-bundle-1` stay checkable — and a diff key carries the bundle
+version the same way it carries the canonicaliser, for the same reason: a rebuild
+under new rules needs a key of its own or the contract will refuse it and the
+newer reading could never be committed at all.
+
+`--bundle-all` on the watch, or `--full` on the command, writes everything.
+
+### What can no longer be recovered
+
+`ancla recover` sorts every period into one of four:
+
+| | |
+|---|---|
+| `diffable` | two copies held; the row-level diff can be produced right now |
+| `priorAnchored` | the chain commits to a copy we do not hold. A candidate can be **tested** against that root; the rows cannot be read out of it |
+| `currentOnly` | one copy, written after the period closed, nothing earlier here or on chain. Gone |
+| `neverRewritten` | one copy, served before the period closed |
+
+Run against the current mirror it groups the gap by the day the publisher wrote it,
+because that is the unit these arrived in:
+
+```
+currentOnly  (158)
+    2022-12-06   106 period(s)   201012 - 201910
+    2022-12-07    26 period(s)   201911 - 202112
+    2022-12-08    11 period(s)   202201 - 202211
+    2022-12-09     1 period(s)   201212 - 201212
+    2024-09-20     7 period(s)   202401 - 202408
+    2024-10-03     1 period(s)   202407 - 202407
+    2024-10-04     1 period(s)   202409 - 202409
+    2025-05-06     3 period(s)   202502 - 202504
+    2026-08-10     2 period(s)   202606 - 202607
+```
+
+144 of those are one bulk publication in December 2022, when the Observatorio first
+loaded the historical series. The remaining 14 are the republication events, and they
+are the ones the earlier writing is about. Listing all 158 one per line would invite
+a reader to count 158 rewrites, which is why they are grouped.
+
+A third-party copy can be offered against any of them:
+
+```bash
+ancla recover --candidate ./someone-elses-202405.zip --period 202405
+```
+
+It canonicalises the file and compares its root against what the chain already holds.
+There are exactly three outcomes, and only one of them is a find:
+
+- **exactHistoricalVersion** — reproduces a root committed *before* the file was
+  offered. This is the prior version.
+- **copyOfHeldVersion** — identical to something already here.
+- **unattestedExternalCopy** — reproduces no committed root. A lead for a reporter.
+  It cannot be treated as the official prior version, and the tool will not label it
+  as one however plausible it looks.
+
 ### The index makes the history answerable
 
 The Observatorio publishes monthly fragments. A procedure opened in March and paid in
@@ -262,8 +473,8 @@ existing in no single archive.
 | `anchor` | DataTransaction serializer, signer, node client, key handling |
 | `delivery` | REST API, OCDS export, alert engine, Spanish i18n, static server |
 | `cli` | Unified `ancla` command over the whole pipeline |
-| `apps/web` | Spanish-first change feed and hosted verifier |
-| `apps/verifier` | Standalone browser verifier, no backend |
+| `apps/web` | Spanish-first change feed, version browser, hosted verifier |
+| `apps/verifier` | Standalone browser verifier, no backend: record proofs and bundle manifests |
 
 One runtime dependency across the whole repo: `@decentralchain/ts-lib-crypto`, used in
 `packages/anchor` for Ed25519 signing. Everything else is `node:` builtins. That is
@@ -293,6 +504,32 @@ case-insensitively, since `RecursosObjecion` ships some columns lower-case.
 `YYYYMM/` folder. Every other archive stores them flat. Both must canonicalize
 identically. This is also a forensic signal: those files were re-exported by a
 different pipeline, not patched in place.
+
+**The publisher writes broken CSV, and it costs rows.** Descriptions carry unescaped
+inch marks inside quoted fields:
+
+```
+"GABINETE DE PARED ABATIBLE PARA RACK DE 19" (482,6 mm), COLOR NEGRO, …"
+"…AJUSTE DE ALTURA DEL RESPALDO DE 2.4", MECANISMO DE AJUSTE RÁPIDO…"
+"…ARTE "BÁRBARO" Y PRERROMÁNICO E ISLAM, AUTOR: LORENZO DE LA PLAZA…"
+```
+
+RFC 4180 requires `""`. A strict reader ends the field at the inch mark and
+desynchronises, and because each stray quote inverts the in/out state it stays
+desynchronised until the next one flips it back — swallowing every row in between
+into a single field. `ancla-canon-1` did exactly that. In 202608 it silently merged
+**9,837 records**, including 3,820 rows of `Sistemas` and 2,737 of
+`DetalleLineaCartel`, and produced one field 730,185 characters long. Eight of nine
+sampled archives across 2015–2026 carry it; only 2010–2014 are clean.
+
+Nothing errored. The records were merged, hashed, indexed and anchored, and the
+counts looked plausible the whole way. It surfaced because a row rendered on the
+version page had four product descriptions inside one field.
+
+`ancla-canon-2` closes a quoted field only when the next byte is the delimiter, a
+line break, or the end of the file. Anything else is a literal quote and the field
+continues — what Python's `csv` and Excel do. After the fix, `Sistemas` and
+`DetalleLineaCartel` parse to exactly their physical line counts.
 
 **One table uses a different delimiter.** `SancionProveedores` is comma-delimited. The
 other 24 use semicolons.
@@ -392,6 +629,11 @@ analytics CLI  node packages/analytics/src/cli.ts <cmd>
 
 delivery       node packages/delivery/src/serve.ts
   serves apps/web plus the API at /api
+  /versions[/:period]             every copy held, and whether it is anchored
+  /bundles[/:period]              published row-level diffs
+  /bundles/:p/:pair               one bundle's manifest, and its commitment on chain
+  /bundles/:p/:pair/changes       a page of changed rows, filterable by kind and table
+  /recovery                       what can still be recovered, and what cannot
 ```
 
 ### Environment
@@ -407,6 +649,69 @@ delivery       node packages/delivery/src/serve.ts
 
 ---
 
+## Hosting
+
+Live at **decentralamerica.com/evidencia**.
+
+It runs as the `ancla` service inside the `decentralamerica` Railway project and
+is proxied from the site's Caddy over Railway's private network, so it needs no
+DNS of its own. A path on that domain rather than a subdomain, because the two
+halves are one argument: the site says a record is being kept, and /evidencia is
+where a reader checks that without leaving.
+
+The prefix is stripped at the proxy and the pages derive their API base from
+their own location, so the export is mountable at any path and still works
+standalone — which is the property that lets anyone host their own copy.
+
+The site is a directory of files. `pnpm export` reduces the 13 GB mirror to about
+35 MB — the pages, the version inventory, the recovery inventory, and every
+published bundle — and writes a self-contained deployable beside the mirror,
+outside the repo.
+
+```bash
+pnpm export                                    # -> $ANCLA_DATA/site
+cd "$ANCLA_DATA/site" && railway up --service ancla
+```
+
+No server, no database, no volume, and nothing deployed can reach the archives,
+the index, or the anchor key. That is a property rather than a shortcut: a static
+site cannot answer one reader differently from another, and anyone who would
+rather not trust us can mirror the whole thing.
+
+Nothing on the host is a trust dependency either way. Every page recomputes its
+digests in the reader's browser with Web Crypto and reads the commitments straight
+off a public DecentralChain node, not through us. `verify-bundle` is the stronger
+check and needs no website at all.
+
+The daily job republishes it when `ANCLA_PUBLISH=1`, alongside `ANCLA_BROADCAST`.
+That step lives in the cron rather than in CI because the export can only run
+where the mirror is, and the mirror is not on a build server. Without it the
+published site is a photograph of whichever day someone last ran the export by
+hand, which is a strange thing for a project whose whole claim is a daily record.
+
+Three things bit during setup and are worth knowing before the next deploy:
+`railway up` walks up to the git root and applies `.gitignore`, so a deployable
+inside an ignored directory uploads almost nothing; Railway's builder honours
+`.dockerignore` when it packs the context, so a Dockerfile that excludes itself
+disappears before it runs; and the service needs `RAILWAY_DOCKERFILE_PATH` set or
+it auto-detects a Node app and tries to build a directory of JSON.
+
+Every anchored publisher is served, not just the first one. `captures`, `bundles`
+and `recovery` return all of them with a `source` on each row, and the page has a
+country picker that only appears when there is more than one. This was a real hole
+rather than a missing feature: Panamá ran the whole pipeline daily — mirrored,
+canonicalised, 37 roots on chain — and appeared nowhere on the site that exists to
+show it, because every read defaulted to Costa Rica.
+
+A publisher with no canonicalisation schema is deliberately still absent. Honduras
+is mirrored and hashed but cannot be turned into records, so there is nothing for a
+version browser to show beyond a file size, and showing it beside Costa Rica would
+imply a claim we cannot back.
+
+The analytics, OCDS and tender endpoints are deliberately not exported. They need
+the SQLite index, they are a different product from the evidence layer, and a
+stale copy of them would be worse than none.
+
 ## Operating it
 
 The daily job is the product. Every day it does not run is a day of history that
@@ -419,8 +724,15 @@ node packages/cli/src/main.ts keygen        # prints the address, never the seed
 
 # daily, after the source refresh at ~13:00 UTC
 node packages/cli/src/main.ts watch && \
-node packages/cli/src/main.ts anchor --broadcast
+node packages/cli/src/main.ts anchor --broadcast && \
+node packages/cli/src/main.ts anchor --versions --broadcast
 ```
+
+`scripts/daily.sh` runs all three for every source that has a schema. The third one
+is what makes a missed day survivable: the roots it writes are addressed by the
+archive's own hash rather than by the calendar, so a copy captured on a day the job
+did not run still gets sealed the next time it does. A rewritten closed month also
+leaves a bundle on disk, and the report names its digest and the command to commit it.
 
 `watch` exits with code `2` when a **closed** month is rewritten with real value
 changes, so a cron wrapper can escalate without parsing prose.
@@ -448,7 +760,20 @@ node packages/cli/src/main.ts prove 202512 Contratos "CE201907001175|01"
 
 # the republication events
 node packages/ingest/src/cli.ts survey
+
+# the commitment to a published row-level diff, straight from a public node
+curl https://mainnet-node.decentralchain.io/addresses/data/\
+3DTwG5ZydbJDuLdEmwfgDEH3NuwDrgwQFtF/diff_202608_7cc3a068c019_2a8f44f57e6b
+
+# rebuild that diff from the two archives and compare
+node packages/cli/src/main.ts verify-bundle 202608
 ```
+
+The browser verifier at `apps/verifier/index.html` does the same check without a
+backend and without this repo: paste a manifest, and it recomputes the digest with
+Web Crypto and reads the committed one off a public node itself. What it cannot do is
+rebuild the bundle from two 50 MB archives — that is `verify-bundle`, and the page
+says so rather than implying otherwise.
 
 | | |
 |---|---|
@@ -467,11 +792,20 @@ node packages/ingest/src/cli.ts survey
 node --test packages/*/test/*.test.ts apps/*/test/*.test.ts
 ```
 
-306 tests across 22 files. The ones that matter most:
+409 tests across 36 files, plus 12 real-data tests that skip cleanly without a mirror. The ones that matter most:
 
 - canonicalization determinism, and number normalization against the integer-corruption bug
 - RFC 6962 proofs at odd and even tree sizes, and the duplicate-leaf case
 - **parity between the browser verifier and the Node implementation**, because if those two drift, every published proof silently stops verifying
+- the same parity for the bundle digest, across all three implementations. The
+  standalone verifier's copy is not re-typed into the test: the test slices the real
+  source out of `apps/verifier/index.html` and evaluates it, so editing the page and
+  forgetting the package fails here rather than in a reader's browser
+- **an archive on disk cannot be replaced**, tested against a live HTTP server. A
+  forced refetch of identical bytes must leave the original inode untouched, and two
+  different bodies under one Last-Modified must become two files
+- a bundle rebuilt from the two real 202608 archives must reproduce its digest byte
+  for byte, and every reported silent revision must name a field that actually differs
 - the differ against real archive data: change one estimated unit price in a real
   1.4M-record archive and exactly one silent revision must be reported, with zero false
   positives; reprint a number and zero revisions must be reported

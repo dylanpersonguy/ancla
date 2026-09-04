@@ -45,6 +45,7 @@ const es = {
 
   'nav.changes': 'Cambios',
   'nav.verify': 'Verificar',
+  'nav.versions': 'Versiones',
   'nav.method': 'Método',
   'nav.api': 'API',
 
@@ -269,6 +270,56 @@ const es = {
   'common.copied': 'Copiado',
   'common.close': 'Cerrar',
   'common.retry': 'Reintentar',
+
+  'versions.title': 'Cada copia que la fuente publicó',
+  'versions.intro':
+    'La fuente publica un archivo por período y lo reescribe en el mismo sitio. Ancla guarda cada copia por separado y le pone una huella. Aquí están todas, con la raíz de cada una y si esa raíz ya está comprometida en la cadena.',
+  'versions.held': 'copias guardadas',
+  'versions.anchored': 'anclada',
+  'versions.notAnchored': 'SIN ANCLAR',
+  'versions.anchorUnknown': 'no se pudo leer la cadena',
+  'versions.anchorMismatch': 'LA RAÍZ NO COINCIDE',
+  'versions.afterClose': 'servida después del cierre del período',
+  'versions.records': 'registros',
+  'versions.root': 'raíz Merkle',
+  'versions.bundle': 'Diferencia publicada',
+  'versions.bundleNone': 'Todavía no hay una diferencia publicada para este par de copias.',
+  'versions.nothingRewritten':
+    'Nada reescrito todavía. Se guardan {captures} copias de {periods} períodos, y ninguna fue publicada dos veces. Eso es la buena noticia: no hay nada que comparar.',
+  'versions.nothingLost': 'Nada perdido: cada período guardado conserva su copia más antigua.',
+  'versions.recovery': 'Qué ya no se puede recuperar',
+  'versions.recoveryIntro':
+    'Una raíz Merkle es un compromiso, no un archivo. Prueba que un archivo cambió; no puede devolver lo que decía antes. Para los períodos de abajo no hay copia anterior en ningún lado, y eso es permanente.',
+  'bundle.title': 'Qué cambió, fila por fila',
+  'bundle.digest': 'huella del paquete',
+  'bundle.changesDigest': 'huella del archivo de cambios',
+  'bundle.onChain': 'comprometida en la cadena',
+  'bundle.notOnChain': 'todavía sin comprometer en la cadena',
+  'bundle.digestOk': 'La huella que calculó su navegador es la que la cadena tiene comprometida.',
+  'bundle.digestBad':
+    'La huella que calculó su navegador NO coincide con la comprometida. No confíe en esta página: rehaga el paquete desde los archivos.',
+  'bundle.field': 'campo',
+  'bundle.before': 'antes',
+  'bundle.after': 'después',
+  'bundle.valuesOmitted': 'solo huellas; los valores no se escribieron en este paquete',
+  'bundle.rebuild': 'Para rehacer todo esto usted mismo, con los dos archivos originales:',
+  'move.numeric': 'cambió de número',
+  'move.filled': 'se llenó',
+  'move.cleared': 'se vació',
+  'move.reprint': 'solo reimpresión',
+  'move.text': 'cambió de texto',
+  'bundle.whichFields': 'Qué campos se movieron',
+  'bundle.table': 'Tabla',
+  'bundle.changes': 'Cambios',
+  'bundle.movement': 'Movimiento',
+  'bundle.direction': 'Sentido',
+  'bundle.summaryPartial':
+    'Resumen sobre {detailed} de {total} filas. Las demás llevan solo huellas: toda revisión silenciosa, retiro y reimpresión conserva sus valores; el presupuesto de detalle se agota en los registros nuevos.',
+  'bundle.anyKind': 'Cualquier tipo',
+  'bundle.anyTable': 'Cualquier tabla',
+  'bundle.anyField': 'Cualquier campo',
+  'bundle.onlyNumeric': 'Solo donde se movió un número',
+  'bundle.showing': 'Mostrando {shown} de {matched} filas que coinciden, sobre {total} cambios.',
 } as const;
 
 export type MessageKey = keyof typeof es;
@@ -281,6 +332,7 @@ const en: Record<MessageKey, string> = {
 
   'nav.changes': 'Changes',
   'nav.verify': 'Verify',
+  'nav.versions': 'Versions',
   'nav.method': 'Method',
   'nav.api': 'API',
 
@@ -504,6 +556,56 @@ const en: Record<MessageKey, string> = {
   'common.copied': 'Copied',
   'common.close': 'Close',
   'common.retry': 'Retry',
+
+  'versions.title': 'Every copy the source published',
+  'versions.intro':
+    'The source publishes one file per period and rewrites it in place. Ancla keeps each copy separately and fingerprints it. Here they all are, with each root and whether that root is already committed on chain.',
+  'versions.held': 'copies held',
+  'versions.anchored': 'anchored',
+  'versions.notAnchored': 'NOT ANCHORED',
+  'versions.anchorUnknown': 'could not read the chain',
+  'versions.anchorMismatch': 'ROOT DOES NOT MATCH',
+  'versions.afterClose': 'served after the period closed',
+  'versions.records': 'records',
+  'versions.root': 'Merkle root',
+  'versions.bundle': 'Published diff',
+  'versions.bundleNone': 'No diff has been published for this pair of copies yet.',
+  'versions.nothingRewritten':
+    'Nothing rewritten yet. {captures} copies of {periods} periods are held, and none was published twice. That is the good outcome: there is nothing to compare.',
+  'versions.nothingLost': 'Nothing lost: every period held still has its earliest copy.',
+  'versions.recovery': 'What can no longer be recovered',
+  'versions.recoveryIntro':
+    'A Merkle root is a commitment, not an archive. It proves a file changed; it cannot give back what the file said. For the periods below no earlier copy exists anywhere, and that is permanent.',
+  'bundle.title': 'What changed, row by row',
+  'bundle.digest': 'bundle digest',
+  'bundle.changesDigest': 'changes file digest',
+  'bundle.onChain': 'committed on chain',
+  'bundle.notOnChain': 'not yet committed on chain',
+  'bundle.digestOk': 'The digest your browser computed is the one the chain has committed.',
+  'bundle.digestBad':
+    'The digest your browser computed does NOT match the committed one. Do not trust this page: rebuild the bundle from the archives.',
+  'bundle.field': 'field',
+  'bundle.before': 'before',
+  'bundle.after': 'after',
+  'bundle.valuesOmitted': 'hashes only; values were not written into this bundle',
+  'bundle.rebuild': 'To rebuild all of this yourself, from the two original archives:',
+  'move.numeric': 'number moved',
+  'move.filled': 'filled in',
+  'move.cleared': 'cleared',
+  'move.reprint': 'reprint only',
+  'move.text': 'text changed',
+  'bundle.whichFields': 'Which fields moved',
+  'bundle.table': 'Table',
+  'bundle.changes': 'Changes',
+  'bundle.movement': 'Movement',
+  'bundle.direction': 'Direction',
+  'bundle.summaryPartial':
+    'Summary over {detailed} of {total} rows. The rest carry hashes only: every silent revision, removal and reprint keeps its values, and the detail budget runs out on newly added records.',
+  'bundle.anyKind': 'Any kind',
+  'bundle.anyTable': 'Any table',
+  'bundle.anyField': 'Any field',
+  'bundle.onlyNumeric': 'Only where a number moved',
+  'bundle.showing': 'Showing {shown} of {matched} matching rows, out of {total} changes.',
 };
 
 export const CATALOGUE: Record<Lang, Record<MessageKey, string>> = {

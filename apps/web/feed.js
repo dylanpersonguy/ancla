@@ -173,36 +173,84 @@ async function loadStats() {
   )} ${stats.anchors.latest ?? t("common.none")}`;
 }
 
+/**
+ * Every change, fetched once.
+ *
+ * The feed is the flattened watch reports, which is hundreds of rows at most, so
+ * one payload is cheaper than a request per page and it is the only shape a
+ * static export can serve. Filtering and paging then happen below, over the same
+ * array, which means this page behaves identically against a live API and
+ * against a folder of files — there is no second code path to disagree with the
+ * first. A live API still narrows server-side; `all` just asks it not to.
+ */
+let allChanges = null;
+let allMeta = null;
+
+async function fetchAll() {
+  if (allChanges) return;
+  const data = await api("/changes?all=1&limit=1000");
+  allChanges = data.changes;
+  allMeta = data.meta;
+}
+
+/** The filters the form offers, applied here rather than in a query string. */
+function matching() {
+  const f = state.filters;
+  return allChanges.filter((c) => {
+    if (f.month && c.month !== f.month) return false;
+    if (f.kind && c.kind !== f.kind) return false;
+    if (f.date && c.detectedAt.slice(0, 10) !== f.date) return false;
+    if (f.institution && (c.institution?.cedula ?? "") !== f.institution) return false;
+    return true;
+  });
+}
+
+/**
+ * A change names its own kind. The export leaves the labels out because they are
+ * language-dependent and the data is not; the catalogue this page already loaded
+ * has both strings. A live API sends them, so prefer those when present.
+ */
+function label(change) {
+  return {
+    kindLabel: change.kindLabel ?? t(`kind.${change.kind}`),
+    kindDescription: change.kindDescription ?? t(`kind.${change.kind}.desc`),
+    tableLabel: change.tableLabel ?? change.table,
+  };
+}
+
 async function loadFeed(append = false) {
   const list = document.getElementById("feed");
   if (!append) list.replaceChildren(el("p", { class: "skeleton" }, t("common.loading")));
-  let data;
   try {
-    data = await api(`/changes?${query()}`);
+    await fetchAll();
   } catch (err) {
     banner(err.message || offlineMessage());
     list.replaceChildren();
     return;
   }
   banner("");
-  state.total = data.meta.total;
+
+  const hits = matching();
+  state.total = hits.length;
+  const page = hits.slice(state.offset, state.offset + PAGE);
 
   if (!append) list.replaceChildren();
-  if (!data.changes.length && !append) {
+  if (!hits.length && !append) {
     list.append(emptyState());
   } else {
-    for (const change of data.changes) list.append(entry(change));
+    for (const change of page) list.append(entry({ ...change, ...label(change) }));
   }
 
+  const shown = Math.min(state.offset + page.length, state.total);
   document.getElementById("count").textContent = t("feed.showing", {
-    shown: fmtNumber(Math.min(state.offset + data.changes.length, state.total)),
+    shown: fmtNumber(shown),
     total: fmtNumber(state.total),
   });
 
   const more = document.getElementById("more");
-  more.classList.toggle("hidden", state.offset + data.changes.length >= state.total);
+  more.classList.toggle("hidden", shown >= state.total);
 
-  if (!data.meta.indexAvailable && state.filters.institution) {
+  if (allMeta && !allMeta.indexAvailable && state.filters.institution) {
     banner(t("error.noIndex"));
   }
 }

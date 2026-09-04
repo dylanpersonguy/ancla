@@ -12,7 +12,8 @@
     "survey": "node packages/ingest/src/cli.ts survey",
     "mirror": "node packages/ingest/src/cli.ts mirror",
     "status": "node packages/ingest/src/cli.ts status",
-    "check": "node --test packages/*/test/*.test.ts apps/*/test/*.test.ts"
+    "check": "node --test packages/*/test/*.test.ts apps/*/test/*.test.ts",
+    "export": "node --max-old-space-size=4096 packages/delivery/src/export.ts"
   },
   "dependencies": {
     "@decentralchain/ts-lib-crypto": "^2.0.0"

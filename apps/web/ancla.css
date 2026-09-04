@@ -92,14 +92,19 @@ a:hover {
   text-decoration: none;
 }
 
+/* The DecentralAmerica mark in its dashed ring, in place of the cyan square.
+   Drawn as a mask rather than an <img> so it takes the wordmark's own colour and
+   stays right in both themes, and so no page markup has to change. */
 .wordmark::after {
   content: "";
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 0.45rem;
-  background: var(--cyan);
-  vertical-align: 0.12em;
+  width: 1.15em;
+  height: 1.15em;
+  margin-left: 0.5rem;
+  vertical-align: -0.22em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20300%22%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%22139%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%227%22%20stroke-dasharray%3D%2211%2011%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20fill%3D%22%23000%22%20fill-rule%3D%22nonzero%22%20d%3D%22M140%2065.5L160%2065.5A2%202%200%200%201%20162%2067.5L162%20164A2%202%200%200%201%20160%20166L140%20166A2%202%200%200%201%20138%20164L138%2067.5A2%202%200%200%201%20140%2065.5ZM228.179%20183.59L218.179%20200.91A2%202%200%200%201%20215.447%20201.642L131.876%20153.392A2%202%200%200%201%20131.144%20150.66L141.144%20133.34A2%202%200%200%201%20143.876%20132.608L227.447%20180.858A2%202%200%200%201%20228.179%20183.59ZM81.821%20200.91L71.821%20183.59A2%202%200%200%201%2072.553%20180.858L156.124%20132.608A2%202%200%200%201%20158.856%20133.34L168.856%20150.66A2%202%200%200%201%20168.124%20153.392L84.553%20201.642A2%202%200%200%201%2081.821%20200.91ZM192.044%20119.007A16%2016%200%201%201%20224.044%20119.007A16%2016%200%201%201%20192.044%20119.007ZM134%20225A16%2016%200%201%201%20166%20225A16%2016%200%201%201%20134%20225ZM75.956%20119.007A16%2016%200%201%201%20107.956%20119.007A16%2016%200%201%201%2075.956%20119.007Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20300%22%3E%3Ccircle%20cx%3D%22150%22%20cy%3D%22150%22%20r%3D%22139%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%227%22%20stroke-dasharray%3D%2211%2011%22%20stroke-linecap%3D%22round%22%2F%3E%3Cpath%20fill%3D%22%23000%22%20fill-rule%3D%22nonzero%22%20d%3D%22M140%2065.5L160%2065.5A2%202%200%200%201%20162%2067.5L162%20164A2%202%200%200%201%20160%20166L140%20166A2%202%200%200%201%20138%20164L138%2067.5A2%202%200%200%201%20140%2065.5ZM228.179%20183.59L218.179%20200.91A2%202%200%200%201%20215.447%20201.642L131.876%20153.392A2%202%200%200%201%20131.144%20150.66L141.144%20133.34A2%202%200%200%201%20143.876%20132.608L227.447%20180.858A2%202%200%200%201%20228.179%20183.59ZM81.821%20200.91L71.821%20183.59A2%202%200%200%201%2072.553%20180.858L156.124%20132.608A2%202%200%200%201%20158.856%20133.34L168.856%20150.66A2%202%200%200%201%20168.124%20153.392L84.553%20201.642A2%202%200%200%201%2081.821%20200.91ZM192.044%20119.007A16%2016%200%201%201%20224.044%20119.007A16%2016%200%201%201%20192.044%20119.007ZM134%20225A16%2016%200%201%201%20166%20225A16%2016%200%201%201%20134%20225ZM75.956%20119.007A16%2016%200%201%201%20107.956%20119.007A16%2016%200%201%201%2075.956%20119.007Z%22%2F%3E%3C%2Fsvg%3E") center / contain no-repeat;
 }
 
 nav {
@@ -121,6 +126,28 @@ nav a[aria-current="page"] {
 
 nav a[aria-current="page"] {
   box-shadow: inset 0 -2px 0 var(--cyan);
+}
+
+/* The way back up to the parent site. Ancla is reached from decentralamerica.com,
+   and without this the evidence pages are a dead end in both directions. The
+   arrow is a ::before so the label stays a bare proper noun for translation. */
+.upsite {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.upsite::before {
+  content: "\2190";
+  margin-right: 0.4rem;
+  opacity: 0.7;
+}
+
+.upsite:hover,
+.upsite:focus-visible {
+  color: var(--ink);
 }
 
 .langs {
@@ -565,4 +592,329 @@ footer {
 
 .hidden {
   display: none !important;
+}
+
+/*
+ * The version browser.
+ *
+ * Same rules as the feed: hairlines, mono for anything copyable, colour only
+ * where it means something. A before/after pair is the one place this page uses
+ * two colours against each other, because that comparison is the whole reason a
+ * reader opened the row.
+ */
+
+.period {
+  margin-top: 3rem;
+}
+
+.period > h2 {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  padding-bottom: 0.5rem;
+}
+
+.capture-head {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.chip.state-ok {
+  border-left-color: var(--cyan);
+  color: var(--ink);
+}
+
+.chip.state-bad {
+  border-left-color: var(--indigo);
+  color: var(--indigo);
+  font-weight: 500;
+}
+
+.chip.state-warn {
+  border-left-color: var(--muted);
+}
+
+.bundle {
+  margin-top: 2rem;
+  border-left: 2px solid var(--rule);
+  padding-left: 1.25rem;
+}
+
+.bundle h3 {
+  font-size: 0.95rem;
+  margin: 0 0 0.4rem;
+}
+
+.cmd {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+  margin: 0.5rem 0 0;
+}
+
+.changes {
+  margin-top: 1rem;
+}
+
+/*
+ * A change is a row of values, not a disclosure triangle.
+ *
+ * The earlier version folded every change away behind a click, which is fine for
+ * ten rows and useless for seven thousand: the reader cannot scan, cannot
+ * compare, and cannot see that only twelve of them touched a number. Values are
+ * on the row. The only thing still folded is an added or removed record, where
+ * the change is the whole row and the question is "what is this", not "what moved".
+ */
+
+.change {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.55rem 0;
+}
+
+details.change > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details.change > summary::-webkit-details-marker {
+  display: none;
+}
+
+details.change > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 0.7rem;
+  margin-right: 0.4rem;
+}
+
+details.change[open] > summary::before {
+  content: "▾";
+}
+
+.change-head {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+}
+
+details.change > summary > .change-head {
+  display: inline-flex;
+}
+
+.change-head .id {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.fieldrow {
+  display: grid;
+  grid-template-columns: minmax(9rem, 15rem) minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: 0 0.65rem;
+  align-items: baseline;
+  font-size: 0.76rem;
+  padding: 0.2rem 0 0.2rem 1.1rem;
+  border-left: 2px solid var(--rule);
+  margin: 0.3rem 0 0 0.15rem;
+}
+
+.fieldrow .fname {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.fieldrow .was,
+.fieldrow .now {
+  overflow-wrap: anywhere;
+}
+
+.fieldrow .was {
+  color: var(--muted);
+}
+
+.fieldrow .arrow {
+  color: var(--rule);
+}
+
+.fieldrow .absent {
+  color: var(--rule);
+}
+
+.fieldrow .delta {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* A number that moved is the one thing on this page worth a colour. */
+.fieldrow.num {
+  border-left-color: var(--indigo);
+}
+
+.fieldrow.num .now,
+.fieldrow.num .delta {
+  color: var(--indigo);
+}
+
+.fieldrow.reprint {
+  opacity: 0.6;
+}
+
+.fieldrow.cleared .was {
+  color: var(--ink);
+}
+
+@media (max-width: 44rem) {
+  .fieldrow {
+    grid-template-columns: 1fr;
+    gap: 0.1rem;
+  }
+  .fieldrow .arrow {
+    display: none;
+  }
+}
+
+.fieldsummary {
+  margin: 1.5rem 0;
+}
+
+.fieldsummary h4 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.fieldsummary tbody tr {
+  cursor: pointer;
+}
+
+.fieldsummary tbody tr:hover {
+  background: var(--sink);
+}
+
+.fieldsummary tr.has-num td:nth-child(2) {
+  color: var(--indigo);
+  font-weight: 500;
+}
+
+.fieldsummary td.n,
+.fieldsummary th.n {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-right: 0.5rem;
+  white-space: nowrap;
+}
+
+.tag.num {
+  color: var(--indigo);
+  font-weight: 500;
+}
+
+.filters .field.check {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: end;
+}
+
+.filters .field.check input {
+  width: auto;
+}
+
+.note.tight {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+table.fields {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.6rem 0 0.2rem;
+  font-size: 0.78rem;
+}
+
+table.fields th {
+  text-align: left;
+  font-weight: 500;
+  color: var(--muted);
+  border-bottom: 1px solid var(--rule);
+  padding: 0.25rem 0.5rem 0.25rem 0;
+}
+
+table.fields td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.3rem 0.5rem 0.3rem 0;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+table.fields td.was {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--rule);
+}
+
+table.fields td.now {
+  color: var(--indigo);
+}
+
+/*
+ * The publisher picker.
+ *
+ * Only shown when there is more than one, because a single-country tab strip
+ * implies choices that do not exist. It reads as a set of tabs rather than a
+ * dropdown: which countries are anchored at all is itself part of the answer.
+ */
+
+.srcpicker {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--rule);
+  margin-top: 2rem;
+}
+
+.srcbtn {
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  padding: 0.5rem 0.2rem;
+  margin-right: 1.1rem;
+}
+
+.srcbtn[aria-pressed="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--ink);
+  font-weight: 600;
+}
+
+/* The filter form's buttons sit in a .row, which carries a top margin meant for
+   stacked blocks. It was zeroed with a style attribute, which the site's own CSP
+   blocks: style-src has no 'unsafe-inline', deliberately. A class does the same
+   job and does not ask the policy to be loosened for one declaration. */
+.row--flush {
+  margin: 0;
 }
