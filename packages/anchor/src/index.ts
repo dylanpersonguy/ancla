@@ -19,6 +19,12 @@ import { type DataEntry, MAX_ENTRIES, type SignedDataTx, signDataTx } from './da
 
 export type AnchorPlan = {
   day: string;
+  /**
+   * What the keys are addressed by. 'day' is the original daily plan below;
+   * 'version' commits to a specific capture and is keyed by its bytes. See
+   * versions.ts for why both exist.
+   */
+  kind?: 'day' | 'version';
   entries: DataEntry[];
   roots: { day: string; root: string; month: string; recordCount: number }[];
 };
@@ -56,7 +62,7 @@ export function planAnchor(day: string, snapshots: Snapshot[], ns?: string): Anc
     roots.push({ day, root: s.merkleRoot, month: s.month, recordCount: s.recordCount });
   }
   entries.push({ key: ns ? `latest_${ns}` : 'latest', type: 'string', value: day });
-  return { day, entries, roots };
+  return { day, kind: 'day', entries, roots };
 }
 
 /**
@@ -91,7 +97,7 @@ export function planAnchorBatched(
       roots.push({ day, root: s.merkleRoot, month: s.month, recordCount: s.recordCount });
     }
     if (isLast) entries.push({ key: ns ? `latest_${ns}` : 'latest', type: 'string', value: day });
-    batches.push({ day, entries, roots });
+    batches.push({ day, kind: 'day', entries, roots });
   }
   return batches;
 }
@@ -105,6 +111,7 @@ export function signAnchor(
   return signDataTx(privateKey, publicKey, plan.entries, timestamp);
 }
 
+export * from './versions.ts';
 export * from './client.ts';
 export * from './key.ts';
 export * from './datatx.ts';

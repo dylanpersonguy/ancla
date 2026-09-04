@@ -28,6 +28,13 @@ import {
 } from '../../ingest/src/observatorio.ts';
 import { readFile } from 'node:fs/promises';
 import type { Source } from '../../ingest/src/source.ts';
+import {
+  FULL_LINES,
+  type LinePolicy,
+  REVISIONS_ONLY,
+  buildBundle,
+} from '../../bundle/src/bundle.ts';
+import { dirFor, persist } from './bundles.ts';
 import { schemaFor } from './schemas.ts';
 import { archives, loadOrBuild, snapshotPath } from './store.ts';
 
@@ -37,9 +44,13 @@ export type WatchFinding = {
   previousStamp: string;
   currentStamp: string;
   diff: DiffResult;
+  /** Set when a row-level evidence bundle was written for this rewrite. */
+  bundle?: { dir: string; bundleDigest: string; changesSha256: string; valuesOmitted: number };
 };
 
 export type WatchReport = {
+  /** Which publisher this run checked. Absent on reports written before 2026-09-04. */
+  source?: string;
   ranAt: string;
   monthsChecked: number;
   monthsUpdated: string[];
@@ -79,12 +90,45 @@ export function rewrittenAfterClose(
   return written ? written.getTime() > source.closesAt(period) : false;
 }
 
+/**
+ * Should this rewrite get a full row-level bundle written to disk?
+ *
+ * A closed month always does: that is the event this project exists to document,
+ * it is rare, and it is small. The open month's daily append is a different
+ * animal — a quarter of a million new rows, 25 MB compressed, every single day —
+ * and writing that as evidence would spend nine gigabytes a year to record that
+ * August grew during August. The counts still go in the report either way, and
+ * `--bundle-all` overrides this for anyone who wants the lot.
+ */
+/**
+ * How much of a rewrite to write out.
+ *
+ * A closed month gets everything: it is the event this project exists to
+ * document, it is rare, and it is small. The open month's daily update is a
+ * different animal — a quarter of a million rows appear because the month is
+ * filling up, which is not news — so its bundle carries the revisions, the
+ * withdrawals and the reprints and leaves the additions counted but unlisted.
+ *
+ * That is a real omission and the manifest says so, inside the digest. It costs
+ * roughly a gigabyte a year instead of nine, and it stops the fifteen hundred
+ * rows anyone would actually ask about from being buried under a quarter of a
+ * million that nobody will.
+ */
+export function policyFor(
+  f: Omit<WatchFinding, 'bundle'>,
+  full = false,
+): LinePolicy {
+  return full || f.closedMonth ? FULL_LINES : REVISIONS_ONLY;
+}
+
 export async function runWatch(
   opts: {
     from?: string;
     to?: string;
     concurrency?: number;
     source?: Source;
+    /** List every added row too, not just revisions, on an open month. */
+    bundleAll?: boolean;
     log?: (s: string) => void;
   } = {},
 ): Promise<WatchReport> {
@@ -130,16 +174,52 @@ export async function runWatch(
     await writeSnapshot(snapshotPath(cur, source), curSnap);
 
     const d = diff(prevSnap, curSnap, { limit: 200 });
-    findings.push({
+    const finding: WatchFinding = {
       month,
       closedMonth: rewrittenAfterClose(source, month, cur.stamp),
       previousStamp: prev.stamp,
       currentStamp: cur.stamp,
       diff: d,
-    });
+    };
+
+    // Every rewrite is bundled. What differs is how much of it is written out,
+    // which policyFor decides and the manifest records inside its own digest.
+    {
+      try {
+        const built = buildBundle(
+          { snapshot: prevSnap, archive: await readFile(prev.path), ref: prev },
+          { snapshot: curSnap, archive: await readFile(cur.path), ref: cur },
+          {
+            schema: schemaFor(source.id),
+            linePolicy: policyFor(finding, opts.bundleAll ?? false),
+          },
+        );
+        const dir = await persist(
+          dirFor(
+            source, month, prev.stamp, cur.stamp,
+            built.manifest.canonVersion, built.manifest.bundleVersion,
+          ),
+          built,
+        );
+        finding.bundle = {
+          dir,
+          bundleDigest: built.manifest.bundleDigest,
+          changesSha256: built.manifest.changesSha256,
+          valuesOmitted: built.manifest.valuesOmitted,
+        };
+        log(`  ${month} bundle ${built.manifest.bundleDigest.slice(0, 16)} -> ${dir}`);
+      } catch (err) {
+        // A bundle that fails to build must not lose the finding: the counts and
+        // both roots are the part that cannot be reconstructed later.
+        log(`  ${month} bundle FAILED: ${(err as Error).message}`);
+      }
+    }
+
+    findings.push(finding);
   }
 
   return {
+    source: source.id,
     ranAt: now.toISOString(),
     monthsChecked: list.length,
     monthsUpdated: updated,
@@ -167,14 +247,33 @@ export function reportText(r: WatchReport): string {
     if (f.closedMonth && substantive > 0) {
       lines.push(`  >> ${substantive.toLocaleString()} records changed or removed in a closed month.`);
     }
+    if (f.bundle) {
+      lines.push(`  bundle ${f.bundle.bundleDigest}`);
+      lines.push(`    ${f.bundle.dir}`);
+      lines.push(`    anchor it with: ancla anchor --versions --month ${f.month} --broadcast`);
+    }
   }
   return lines.join('\n');
 }
 
-export async function writeReport(r: WatchReport): Promise<string> {
+/**
+ * One report per source per day.
+ *
+ * The name used to be `watch-<day>.json` with no source in it, and the daily job
+ * runs every publisher in turn against the same data root. So the second run of
+ * the day overwrote the first: on 2026-09-03 Costa Rica found 1,110 silent
+ * revisions and 834 removals at 15:30, and Panama's quiet run at 19:32 replaced
+ * that file with `findings: []`. The change feed read empty for the same reason,
+ * and the findings themselves were gone.
+ *
+ * Costa Rica keeps the unsuffixed name because three reports already exist under
+ * it and the reader globs for them; every other publisher carries its id.
+ */
+export async function writeReport(r: WatchReport, source?: Source): Promise<string> {
   const dir = join(dataRoot(), 'reports');
   await mkdir(dir, { recursive: true });
-  const path = join(dir, `watch-${r.ranAt.slice(0, 10)}.json`);
+  const suffix = !source || source.id === 'cr-observatorio' ? '' : `-${source.id}`;
+  const path = join(dir, `watch-${r.ranAt.slice(0, 10)}${suffix}.json`);
   await writeFile(path, JSON.stringify(r, null, 2), 'utf8');
   return path;
 }

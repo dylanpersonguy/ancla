@@ -10,6 +10,17 @@ import type { SignedDataTx } from './datatx.ts';
 
 export const DEFAULT_NODE = 'https://mainnet-node.decentralchain.io';
 
+/**
+ * The account the roots are written to. Public by design: the whole point is that
+ * anyone can read it without asking us. Override with ANCLA_ANCHOR_ADDRESS when
+ * running against a test account.
+ */
+export const DEFAULT_ANCHOR_ADDRESS = '3DTwG5ZydbJDuLdEmwfgDEH3NuwDrgwQFtF';
+
+export function anchorAddress(): string {
+  return process.env.ANCLA_ANCHOR_ADDRESS ?? DEFAULT_ANCHOR_ADDRESS;
+}
+
 export function nodeUrl(): string {
   return process.env.ANCLA_NODE ?? DEFAULT_NODE;
 }
@@ -53,6 +64,11 @@ export async function readRoot(
   if (!root) return null;
   const meta = await readEntry(address, `meta_${day}`, node);
   return { root: String(root.value), meta: meta ? String(meta.value) : null };
+}
+
+/** Every data entry on an account. The node returns the whole set in one call. */
+export async function readAllEntries(address: string, node = nodeUrl()): Promise<DataRecord[]> {
+  return getJson<DataRecord[]>(`${node}/addresses/data/${address}`);
 }
 
 export async function balance(addr: string, node = nodeUrl()): Promise<number> {

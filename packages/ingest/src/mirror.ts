@@ -9,7 +9,7 @@
 
 import { createHash } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
+import { link, mkdir, readdir, rm, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -80,6 +80,31 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
     }
   }
   throw new Error(`${label} failed after ${MAX_ATTEMPTS} attempts: ${String(lastError)}`);
+}
+
+/**
+ * Move a downloaded file into place, and refuse to replace anything already there.
+ *
+ * `rename` would overwrite, which is the one thing this store must never do. The
+ * name carries the publisher's Last-Modified and the first twelve hex of the
+ * content hash, so a collision means we already hold these exact bytes under this
+ * exact stamp — but "the name says it is the same file" is not the same claim as
+ * "the file was not replaced", and only one of the two is enforceable. `link`
+ * fails with EEXIST rather than clobbering, so the copy stored first is the copy
+ * that stays, and --force cannot quietly rewrite history.
+ *
+ * Returns true when this call is what put the file there.
+ */
+async function placeOnce(tmp: string, dest: string): Promise<boolean> {
+  try {
+    await link(tmp, dest);
+    await unlink(tmp);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    await rm(tmp, { force: true });
+    return false;
+  }
 }
 
 export type PeriodOutcome = manifest.Observation;
@@ -153,7 +178,7 @@ export async function mirrorPeriod(
       downloadHashed(source.url(period), tmp),
     );
     const name = `${stamp}-${sha256.slice(0, 12)}.${source.extension}`;
-    await rename(tmp, join(dir, name));
+    const placed = await placeOnce(tmp, join(dir, name));
 
     const entry: PeriodOutcome = {
       ...base,
@@ -161,11 +186,15 @@ export async function mirrorPeriod(
       contentLength: bytes,
       sha256,
       path: join('archives', period, name),
-      status: 'stored',
+      status: placed ? 'stored' : 'unchanged',
     };
     await manifest.append(source, entry);
     const mb = (bytes / 1_048_576).toFixed(1);
-    log(`  ${period}  stored  ${mb} MB  ${sha256.slice(0, 12)}`);
+    log(
+      placed
+        ? `  ${period}  stored  ${mb} MB  ${sha256.slice(0, 12)}`
+        : `  ${period}  already held  ${sha256.slice(0, 12)}`,
+    );
     return entry;
   } catch (err) {
     await rm(tmp, { force: true });

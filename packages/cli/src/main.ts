@@ -18,9 +18,20 @@ import { buildSnapshot, leafFor, writeSnapshot } from '../../canonicalize/src/sn
 import { proof, root as merkleRoot, verify as merkleVerify } from '../../merkle/src/index.ts';
 import { diff, summarize } from '../../differ/src/index.ts';
 import {
-  balance, broadcast, generateKey, height, keyExists, keyPath, loadKeys,
-  MAINNET_CHAIN_ID, planAnchor, planAnchorBatched, readRoot, signAnchor, version,
+  type AnchoredDiff, type AnchoredVersion, type Capture as ChainCapture, type DiffCommitment,
+  balance, broadcast, generateKey, groupVersionEntries, height, keyExists, keyPath, loadKeys,
+  MAINNET_CHAIN_ID, anchorAddress, planAnchor, planAnchorBatched, planCaptures, readAllEntries,
+  readRoot, signAnchor, version,
 } from '../../anchor/src/index.ts';
+import { UNLIMITED_DETAIL } from '../../bundle/src/bundle.ts';
+import { verificationText, verifyAgainstArchives, verifyBundle } from '../../bundle/src/verify.ts';
+import {
+  archivesForManifest, buildFor, dirFor, listBundles, loadBundle, persist,
+} from './bundles.ts';
+import {
+  type Capture, allCaptures, anchorNs as nsFor, capturesFor, forSource, recoveryInventory,
+  testCandidate,
+} from './versions.ts';
 import { allSnapshotHeaders, archives, loadOrBuild, months, snapshotPath } from './store.ts';
 import { resolveSource } from '../../ingest/src/sources.ts';
 import type { Source } from '../../ingest/src/source.ts';
@@ -36,6 +47,12 @@ function parseArgs(argv: string[]) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--broadcast') flags.broadcast = true;
+    else if (a === '--json') flags.json = true;
+    else if (a === '--full') flags.full = true;
+    else if (a === '--versions') flags.versions = true;
+    else if (a === '--offline') flags.offline = true;
+    else if (a === '--bundle-all') flags['bundle-all'] = true;
+    else if (a === '--new-canon') flags['new-canon'] = true;
     else if (a === '--yes') flags.yes = true;
     else if (a === '--force') flags.force = true;
     else if (a === '--all') flags.all = true;
@@ -45,14 +62,9 @@ function parseArgs(argv: string[]) {
   return { flags, positional };
 }
 
-/**
- * Costa Rica anchors unprefixed because two of its roots are already on chain
- * under those names and the site reads `latest` to show when the record was last
- * sealed. Every later country carries its code, on the same address, so there is
- * one identity to publish and protect rather than one per country.
- */
+/** `undefined` rather than `null`, because that is what the anchor plans take. */
 function anchorNs(source: Source): string | undefined {
-  return source.id === 'cr-observatorio' ? undefined : source.country.toLowerCase();
+  return nsFor(source) ?? undefined;
 }
 
 async function cmdSnapshot(targets: string[], source: Source): Promise<void> {
@@ -311,12 +323,13 @@ async function cmdWatch(flags: Record<string, string | boolean>, source: Source)
     source,
     from: flags.from as string | undefined,
     to: flags.to as string | undefined,
+    bundleAll: Boolean(flags['bundle-all']),
     log: (s) => out(s),
   });
   out('');
   out(reportText(r));
   out('');
-  out(`report written to ${await writeReport(r)}`);
+  out(`report written to ${await writeReport(r, source)}`);
   // Exit 2 signals "a closed month was rewritten with real changes", so a cron
   // wrapper can page someone without parsing prose.
   const material = r.findings.some(
@@ -335,6 +348,372 @@ async function cmdNode(): Promise<void> {
   }
 }
 
+/**
+ * Read the account's commitments, or say plainly that we could not.
+ *
+ * Every command that reports on anchoring works offline too: a node outage must
+ * not turn "we hold two copies" into an error. It degrades to "anchor state
+ * unknown", which is different from "not anchored" and is labelled as such.
+ */
+async function anchoredVersions(
+  flags: Record<string, string | boolean>,
+): Promise<{
+  versions: AnchoredVersion[];
+  diffs: AnchoredDiff[];
+  reachable: boolean;
+  error?: string;
+}> {
+  const empty = { versions: [], diffs: [] };
+  if (flags.offline) return { ...empty, reachable: false, error: 'offline' };
+  try {
+    return { ...groupVersionEntries(await readAllEntries(anchorAddress())), reachable: true };
+  } catch (err) {
+    return { ...empty, reachable: false, error: (err as Error).message };
+  }
+}
+
+function captureLine(c: Capture, chainKnown: boolean): string {
+  const root = c.merkleRoot ? c.merkleRoot.slice(0, 16) : 'not canonicalised';
+  const anchored =
+    !chainKnown ? 'anchor unknown'
+    : c.anchoredRoot === null ? 'NOT ANCHORED'
+    : c.anchorMatches ? 'anchored'
+    : 'ANCHOR MISMATCH';
+  const size = `${(c.bytes / 1_048_576).toFixed(1)} MB`;
+  return `  ${c.stamp}  ${size.padStart(9)}  ${root.padEnd(18)} ${
+    (c.recordCount?.toLocaleString() ?? '-').padStart(11)
+  }  ${anchored}${c.afterClose ? '   (served after close)' : ''}`;
+}
+
+async function cmdVersions(
+  period: string | undefined,
+  source: Source,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  const chain = await anchoredVersions(flags);
+  const caps = period
+    ? await capturesFor(period, source, chain.versions)
+    : await allCaptures(source, chain.versions);
+  if (flags.json) {
+    out(JSON.stringify({ source: source.id, chain, captures: caps }, null, 2));
+    return;
+  }
+
+  out(source.label);
+  out(chain.reachable
+    ? `chain ${anchorAddress()}  ${chain.versions.length} capture commitment(s)`
+    : `chain unreachable (${chain.error}); anchor state is unknown, not absent`);
+  out('');
+
+  const byPeriod = new Map<string, Capture[]>();
+  for (const c of caps) {
+    const list = byPeriod.get(c.period);
+    if (list) list.push(c);
+    else byPeriod.set(c.period, [c]);
+  }
+  let multi = 0;
+  for (const [p, list] of [...byPeriod.entries()].sort()) {
+    if (list.length > 1) multi++;
+    if (!period && list.length < 2) continue; // the full listing is about rewrites
+    out(`${p}   ${list.length} cop${list.length === 1 ? 'y' : 'ies'}`);
+    for (const c of list) out(captureLine(c, chain.reachable));
+  }
+  out('');
+  out(`${caps.length.toLocaleString()} captures across ${byPeriod.size} periods; ${multi} period(s) hold more than one.`);
+  if (!period && multi === 0) out('Pass a period to list its single copy.');
+}
+
+async function cmdRecover(
+  source: Source,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  const chain = await anchoredVersions(flags);
+
+  if (flags.candidate) {
+    const period = flags.period as string;
+    if (!period) throw new Error('usage: ancla recover --candidate <file> --period <YYYYMM>');
+    const r = await testCandidate(flags.candidate as string, period, source, chain.versions);
+    if (flags.json) return out(JSON.stringify(r, null, 2));
+    out(`candidate for ${period}`);
+    out(`  file        ${r.path}`);
+    out(`  sha256      ${r.archiveSha256}`);
+    out(`  merkle root ${r.merkleRoot}`);
+    out(`  records     ${r.recordCount.toLocaleString()}`);
+    out('');
+    out(`  ${r.verdict}`);
+    out(`  ${r.note}`);
+    if (!chain.reachable) out('  (chain unreachable: only local copies were compared)');
+    return;
+  }
+
+  const inv = await recoveryInventory(source, chain.versions);
+  if (flags.json) return out(JSON.stringify({ chain, inventory: inv }, null, 2));
+
+  const groups = new Map<string, typeof inv>();
+  for (const r of inv) {
+    const list = groups.get(r.status);
+    if (list) list.push(r);
+    else groups.set(r.status, [r]);
+  }
+  out(source.label);
+  out('What can still be recovered, and what cannot.');
+  out('');
+  for (const status of ['diffable', 'priorAnchored', 'currentOnly', 'neverRewritten'] as const) {
+    const list = groups.get(status) ?? [];
+    if (!list.length) continue;
+    out(`${status}  (${list.length})`);
+    out(`  ${list[0]?.note}`);
+    if (status === 'diffable' || status === 'priorAnchored') {
+      for (const r of list) {
+        out(`    ${r.period}  ${r.held} held${r.orphanRoots.length ? `  ${r.orphanRoots.length} root(s) on chain with no copy here` : ''}`);
+      }
+    } else if (status === 'currentOnly') {
+      // By the day the publisher wrote them, because that is the unit these
+      // arrived in. One bulk load in December 2022 accounts for most of them.
+      const byDay = new Map<string, string[]>();
+      for (const r of list) {
+        const d = r.servedDay ?? 'unknown';
+        const at = byDay.get(d);
+        if (at) at.push(r.period);
+        else byDay.set(d, [r.period]);
+      }
+      for (const [day, periods] of [...byDay.entries()].sort()) {
+        const sorted = periods.sort();
+        out(`    ${day}   ${String(periods.length).padStart(3)} period(s)   ${sorted[0]} - ${sorted[sorted.length - 1]}`);
+      }
+    }
+    out('');
+  }
+  if (!chain.reachable) {
+    out('The chain was not reachable, so "currentOnly" here may be "priorAnchored".');
+    out('Rerun without --offline once the node answers.');
+  }
+}
+
+async function cmdBundle(
+  period: string,
+  source: Source,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  if (!period) throw new Error('usage: ancla bundle <YYYYMM> [--from stamp] [--to stamp]');
+  const { bundle, dir, from, to } = await buildFor(period, source, {
+    fromStamp: flags.from as string | undefined,
+    toStamp: flags.to as string | undefined,
+    maxDetail: flags.full ? UNLIMITED_DETAIL : undefined,
+    log: flags.json ? undefined : (l) => out(l),
+  });
+  await persist(dir, bundle);
+  const m = bundle.manifest;
+  if (flags.json) return out(JSON.stringify(m, null, 2));
+
+  out('');
+  out(`${period}  ${from.stamp} -> ${to.stamp}`);
+  out(`  records        ${m.from.recordCount.toLocaleString()} -> ${m.to.recordCount.toLocaleString()}`);
+  for (const k of ['added', 'recordedAmendment', 'silentRevision', 'reformatted', 'removed'] as const) {
+    out(`  ${k.padEnd(18)} ${m.counts[k].toLocaleString()}`);
+  }
+  if (m.valuesOmitted) {
+    out(`  ${m.valuesOmitted.toLocaleString()} rows carry hashes only (detail budget ${m.detailPolicy.maxDetail.toLocaleString()}; rerun with --full)`);
+  }
+  out('');
+  out(`  bundle digest  ${m.bundleDigest}`);
+  out(`  changes sha256 ${m.changesSha256}`);
+  out(`  written to     ${dir}`);
+  out('');
+  out(`anchor it:  ancla anchor --versions --month ${period} --broadcast`);
+  out(`check it:   ancla verify-bundle ${period}`);
+}
+
+async function cmdVerifyBundle(
+  target: string,
+  source: Source,
+  flags: Record<string, string | boolean>,
+): Promise<void> {
+  let dir = target;
+  if (/^\d{4}(\d{2})?$/.test(target ?? '')) {
+    const found = (await listBundles(source)).filter((b) => b.period === target);
+    if (!found.length) throw new Error(`no bundle stored for ${target}. run: ancla bundle ${target}`);
+    dir = (found[found.length - 1] as (typeof found)[number]).dir;
+  }
+  if (!dir) throw new Error('usage: ancla verify-bundle <YYYYMM|directory>');
+
+  const { manifest, changes } = await loadBundle(dir);
+  const own = verifyBundle(manifest, changes);
+  const archivesFound = await archivesForManifest(manifest, source);
+  const against = archivesFound
+    ? verifyAgainstArchives(manifest, changes, archivesFound.from, archivesFound.to, schemaFor(source.id))
+    : null;
+
+  const chain = await anchoredVersions(flags);
+  const onChain = chain.diffs.find(
+    (d) =>
+      (d.ns ?? null) === (nsFor(source) ?? null) &&
+      d.canonVersion === manifest.canonVersion &&
+      d.period === manifest.period &&
+      d.fromId === manifest.from.archiveSha256.slice(0, 12) &&
+      d.toId === manifest.to.archiveSha256.slice(0, 12),
+  );
+
+  if (flags.json) {
+    return out(JSON.stringify({ dir, manifest, own, against, onChain: onChain ?? null }, null, 2));
+  }
+
+  out(`bundle ${dir}`);
+  out(`  ${manifest.period}  ${manifest.from.stamp} -> ${manifest.to.stamp}  (${manifest.canonVersion}, ${manifest.bundleVersion})`);
+  out('');
+  out('self-consistency');
+  out(verificationText(own));
+  out('');
+  if (against) {
+    out('rebuilt from the archives it names');
+    out(verificationText(against));
+  } else {
+    out('rebuilt from the archives it names');
+    out('  skipped: neither archive is on this machine.');
+    out(`  need ${manifest.from.file} and ${manifest.to.file} under archives/${manifest.period}/`);
+  }
+  out('');
+  out('committed on chain');
+  if (!chain.reachable) out(`  unknown: ${chain.error}`);
+  else if (!onChain) out('  no commitment found for this pair of copies.');
+  else {
+    const ok = onChain.bundleDigest === manifest.bundleDigest;
+    out(`  ${ok ? 'ok  ' : 'FAIL'}  digest on chain  ${onChain.bundleDigest}`);
+    if (!ok) out(`        bundle says      ${manifest.bundleDigest}`);
+  }
+}
+
+/**
+ * Commit every capture we hold, and every bundle we have published, under keys
+ * derived from their own bytes rather than from the day the job ran.
+ *
+ * Already-committed keys are dropped from the plan rather than resent: the
+ * contract refuses to overwrite, so resending would spend a fee to be rejected.
+ * That refusal is the property being relied on, not a nuisance being worked
+ * around — see contracts/ancla.ride.
+ */
+async function cmdAnchorVersions(
+  day: string,
+  flags: Record<string, string | boolean>,
+  source: Source,
+): Promise<void> {
+  const ns = anchorNs(source);
+  const chain = await anchoredVersions(flags);
+  const known = new Set(
+    forSource(chain.versions, source).map((v) => `${v.period}_${v.id}_${v.canonVersion}`),
+  );
+
+  const period = flags.month as string | undefined;
+  const caps = (period ? await capturesFor(period, source) : await allCaptures(source)).filter(
+    (c) => c.merkleRoot && c.archiveSha256,
+  );
+  const pending: ChainCapture[] = caps
+    .filter(
+      (c) => !known.has(`${c.period}_${(c.archiveSha256 as string).slice(0, 12)}_${c.canonVersion}`),
+    )
+    .map((c) => ({
+      period: c.period,
+      stamp: c.stamp,
+      archiveSha256: c.archiveSha256 as string,
+      merkleRoot: c.merkleRoot as string,
+      recordCount: c.recordCount ?? 0,
+      canonVersion: c.canonVersion ?? '',
+    }));
+
+  const anchoredDiffs = new Set(
+    chain.diffs
+      .filter((d) => (d.ns ?? null) === (ns ?? null))
+      .map((d) => `${d.period}_${d.fromId}_${d.toId}_${d.canonVersion}`),
+  );
+  const bundles = (await listBundles(source)).filter((b) => !period || b.period === period);
+  const pendingDiffs: DiffCommitment[] = bundles
+    .filter((b) => {
+      const k = `${b.manifest.period}_${b.manifest.from.archiveSha256.slice(0, 12)}_${b.manifest.to.archiveSha256.slice(0, 12)}_${b.manifest.canonVersion}`;
+      return !anchoredDiffs.has(k);
+    })
+    .map((b) => ({
+      period: b.manifest.period,
+      canonVersion: b.manifest.canonVersion,
+      fromSha256: b.manifest.from.archiveSha256,
+      toSha256: b.manifest.to.archiveSha256,
+      bundleDigest: b.manifest.bundleDigest,
+      bundleVersion: b.manifest.bundleVersion,
+      changesSha256: b.manifest.changesSha256,
+      counts: b.manifest.counts,
+    }));
+
+  out(`capture anchor for ${day}   (${source.label})`);
+  out(`  captures held        ${caps.length.toLocaleString()}`);
+  out(`  already committed    ${(caps.length - pending.length).toLocaleString()}${chain.reachable ? '' : '  (chain unreachable; treating all as pending)'}`);
+  out(`  to commit            ${pending.length.toLocaleString()} capture(s), ${pendingDiffs.length} bundle(s)`);
+
+  if (!pending.length && !pendingDiffs.length) {
+    out('');
+    out('Nothing to do. Every capture and bundle held here is already on chain.');
+    return;
+  }
+  if (!chain.reachable) {
+    out('');
+    out('Refusing to broadcast without reading the account first: every key would');
+    out('collide with one already written and the fee would buy a rejection.');
+    process.exitCode = 1;
+    return;
+  }
+
+  // A canonicaliser bump must not re-anchor the whole history on the next cron
+  // tick. The first commitment under a new set of rules is a judgement about
+  // whether those rules are right, and it is irreversible once broadcast, so a
+  // person makes it once and the schedule carries on afterwards.
+  const canonOnChain = new Set(forSource(chain.versions, source).map((v) => v.canonVersion));
+  const fresh = [...new Set(pending.map((c) => c.canonVersion))].filter(
+    (v) => canonOnChain.size > 0 && !canonOnChain.has(v),
+  );
+  if (fresh.length && !flags['new-canon']) {
+    out('');
+    out(`${fresh.join(', ')} has no commitment on this account yet.`);
+    out(`This would be the first, across ${pending.length.toLocaleString()} capture(s).`);
+    out('');
+    out('A canonicaliser bump changes every root, so this is a decision about whether');
+    out('the new rules are right, not a routine anchor. Nothing already on chain is');
+    out('affected either way: the older commitments stay, and stay true.');
+    out('');
+    out('When you have satisfied yourself, rerun with --new-canon --broadcast.');
+    process.exitCode = 1;
+    return;
+  }
+
+  const batches = planCaptures(day, pending, pendingDiffs, ns);
+  batches.forEach((b, i) => out(`    batch ${i + 1}  ${b.entries.length} entries`));
+
+  if (!flags.broadcast) {
+    out('');
+    out('dry run. nothing was sent.');
+    out('to broadcast: rerun with --broadcast');
+    return;
+  }
+
+  const keys = await loadKeys(MAINNET_CHAIN_ID);
+  const signed = batches.map((b, i) => signAnchor(b, keys.privateKey, keys.publicKey, Date.now() + i));
+  const totalFee = signed.reduce((sum, t) => sum + t.fee, 0);
+  const bal = await balance(keys.address);
+  out('');
+  out(`  sender  ${keys.address}`);
+  out(`  balance ${(bal / 1e8).toFixed(8)} DCC`);
+  out(`  fee     ${(totalFee / 1e8).toFixed(8)} DCC total`);
+  if (bal < totalFee) {
+    out(`insufficient balance. need ${(totalFee / 1e8).toFixed(8)} DCC.`);
+    process.exitCode = 1;
+    return;
+  }
+  out('');
+  for (let i = 0; i < signed.length; i++) {
+    const res = await broadcast(signed[i] as (typeof signed)[number]);
+    out(`  batch ${i + 1}/${signed.length}  ${res.id}`);
+  }
+  out('');
+  out(`${pending.length} capture(s) and ${pendingDiffs.length} bundle(s) committed, keyed by their own bytes.`);
+}
+
 const { flags, positional } = parseArgs(process.argv.slice(3));
 const cmd = process.argv[2];
 
@@ -351,7 +730,27 @@ try {
       await cmdKeygen(flags);
       break;
     case 'anchor':
-      await cmdAnchor(flags, source);
+      if (flags.versions) {
+        await cmdAnchorVersions(
+          (flags.day as string) ?? new Date().toISOString().slice(0, 10),
+          flags,
+          source,
+        );
+      } else {
+        await cmdAnchor(flags, source);
+      }
+      break;
+    case 'versions':
+      await cmdVersions(positional[0] as string | undefined, source, flags);
+      break;
+    case 'recover':
+      await cmdRecover(source, flags);
+      break;
+    case 'bundle':
+      await cmdBundle(positional[0] as string, source, flags);
+      break;
+    case 'verify-bundle':
+      await cmdVerifyBundle(positional[0] as string, source, flags);
       break;
     case 'history':
       await cmdHistory(
@@ -390,7 +789,12 @@ try {
           '  diff <YYYYMM>                 compare a month’s two most recent versions',
           '  keygen                        create the anchor account (seed stays on disk)\n  anchor [--day D] [--month M]  commit roots to DecentralChain\n         [--all]                every snapshotted month, batched',
           '         [--broadcast]          without --broadcast this is a dry run',
-          '  watch [--from M] [--to M]     the daily job: refetch, diff, report\n  prove <YYYYMM> <Table> <id>   Merkle proof for one record\n         [--day YYYY-MM-DD]     stamp the anchored day into the proof',
+          '         [--versions]           commit every capture and bundle, keyed by bytes\n         [--new-canon]          allow the first commitment under new canon rules',
+          '  versions [YYYYMM]             every copy held, and whether it is anchored',
+          '  bundle <YYYYMM>               row-level evidence bundle for a republication\n         [--from S] [--to S]    compare two named copies\n         [--full]               write values for every change, not just revisions',
+          '  verify-bundle <YYYYMM|dir>    rebuild a bundle from the archives and check it',
+          '  recover [--candidate F]       what can still be recovered, and what cannot\n          [--period YYYYMM]     test one outside copy against the anchored roots',
+          '  watch [--from M] [--to M]     the daily job: refetch, diff, bundle, report\n         [--bundle-all]         list added rows too, not only revisions\n  prove <YYYYMM> <Table> <id>   Merkle proof for one record\n         [--day YYYY-MM-DD]     stamp the anchored day into the proof',
           '  node                          chain reachability check',
           '',
           `data root ${dataRoot()}   (override with ANCLA_DATA)`,
