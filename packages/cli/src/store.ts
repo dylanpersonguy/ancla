@@ -1,7 +1,8 @@
 /** Where snapshots live, and how to find the archives they came from. */
 
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
+import { CANON_VERSION } from '../../canonicalize/src/canonical.ts';
 import {
   buildSnapshot,
   readSnapshot,
@@ -69,9 +70,62 @@ export async function archives(
     }));
 }
 
-export function snapshotPath(ref: ArchiveRef, source: Source = OBSERVATORIO): string {
+/**
+ * Where a snapshot lives, per canonicaliser version.
+ *
+ * Snapshots used to be named for the archive alone, which was fine while there
+ * was one set of rules. It stops being fine the moment the rules change:
+ * re-snapshotting under ancla-canon-2 would overwrite the v1 file, and the v1
+ * roots already committed on chain would no longer be reproducible from anything
+ * on this disk. The archive is the evidence and it is untouched either way, but
+ * "you can rebuild it from the ZIP in twenty minutes" is a much weaker offer than
+ * "it is right here".
+ *
+ * The legacy unsuffixed path is still read, so nothing already built is orphaned.
+ */
+export function snapshotPath(
+  ref: ArchiveRef,
+  source: Source = OBSERVATORIO,
+  canonVersion: string = CANON_VERSION,
+): string {
+  const ext = `.${source.extension}`;
+  const dir = join(sourceRoot(source), 'snapshots', ref.month);
+  const base = basename(ref.file, ext);
+  return join(dir, `${base}.${canonVersion}.snap.gz`);
+}
+
+/** The pre-versioning path. Read-only: nothing writes here any more. */
+export function legacySnapshotPath(ref: ArchiveRef, source: Source = OBSERVATORIO): string {
   const ext = `.${source.extension}`;
   return join(sourceRoot(source), 'snapshots', ref.month, `${basename(ref.file, ext)}.snap.gz`);
+}
+
+/**
+ * Every snapshot held for an archive, newest rules first.
+ *
+ * More than one means the archive has been canonicalised under more than one set
+ * of rules, which is a normal state after a version bump and is what keeps an
+ * older anchored root checkable.
+ */
+export async function snapshotsFor(
+  ref: ArchiveRef,
+  source: Source = OBSERVATORIO,
+): Promise<{ path: string; canonVersion: string }[]> {
+  const out: { path: string; canonVersion: string }[] = [];
+  const current = snapshotPath(ref, source);
+  const legacy = legacySnapshotPath(ref, source);
+  for (const [path, version] of [
+    [current, CANON_VERSION],
+    [legacy, 'ancla-canon-1'],
+  ] as const) {
+    try {
+      await stat(path);
+      out.push({ path, canonVersion: version });
+    } catch {
+      /* not built under these rules */
+    }
+  }
+  return out;
 }
 
 /**
@@ -86,9 +140,10 @@ export async function loadOrBuild(
   if (ref.source !== source.id) {
     throw new Error(`archive is from ${ref.source} but the store was asked for ${source.id}`);
   }
-  const p = snapshotPath(ref, source);
+  // Only a snapshot built under the current rules is usable for a comparison. A
+  // v1 file on disk is kept for checking v1 roots, not for feeding today's differ.
   try {
-    return await readSnapshot(p);
+    return await readSnapshot(snapshotPath(ref, source));
   } catch {
     return buildSnapshot(ref.month, await readFile(ref.path), schemaFor(ref.source));
   }

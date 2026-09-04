@@ -13,18 +13,16 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import {
-  type CanonRecord,
-  detectDelimiter,
-  parseCsv,
-} from '../../canonicalize/src/canonical.ts';
-import { tableDef } from '../../canonicalize/src/schema.ts';
+import type { CanonRecord } from '../../canonicalize/src/canonical.ts';
+import { findRows } from '../../canonicalize/src/identity.ts';
+import type { Schema } from '../../canonicalize/src/schema.ts';
 import { leafFor } from '../../canonicalize/src/snapshot.ts';
 import { listEntries, readEntry, tableNameOf } from '../../canonicalize/src/zip.ts';
 import { proof, verify as merkleVerify } from '../../merkle/src/index.ts';
 import { OBSERVATORIO } from '../../ingest/src/observatorio.ts';
 import type { Source } from '../../ingest/src/source.ts';
 import { type ArchiveRef, archives, loadOrBuild } from './store.ts';
+import { schemaFor } from './schemas.ts';
 
 export type FieldChange = { field: string; before: string | null; after: string | null };
 
@@ -63,36 +61,21 @@ export type RecordHistory = {
 /**
  * The row's fields, keyed by column, from one archive.
  *
- * The id is rebuilt exactly as canonicalizeTable builds it, because a row is
- * only findable by the same rule that named it. Returns null when the table or
- * the row is absent from this copy, which is itself an answer.
+ * Identity comes from `findRows`, which is the same rule the canonicalizer used
+ * to name the row in the first place. An earlier version rebuilt the id here from
+ * the declared key alone, so any content-addressed row — `sha256:...#2`, which is
+ * most of three tables — was unfindable and reported as absent from a copy that
+ * contained it.
  */
 export function rowFields(
   archive: Buffer,
   table: string,
   id: string,
+  schema?: Schema,
 ): Record<string, string> | null {
   const entry = listEntries(archive).find((e) => tableNameOf(e.name) === table);
   if (!entry) return null;
-  const buf = readEntry(archive, entry);
-  const it = parseCsv(buf, detectDelimiter(buf));
-  const first = it.next();
-  if (first.done) return null;
-  const header = first.value.map((h) => h.trim().replace(/^﻿/, ''));
-
-  const def = tableDef(table);
-  const keyCols = (def?.key ?? []).filter((k) => header.includes(k));
-  if (!keyCols.length || keyCols.length !== (def?.key.length ?? 0)) return null;
-  const keyIdx = keyCols.map((k) => header.indexOf(k));
-
-  for (const row of it) {
-    const rowId = keyIdx.map((i) => (row[i] ?? '').trim()).join('|');
-    if (rowId !== id) continue;
-    const out: Record<string, string> = {};
-    for (let i = 0; i < header.length; i++) out[header[i] as string] = row[i] ?? '';
-    return out;
-  }
-  return null;
+  return findRows(table, readEntry(archive, entry), new Set([id]), schema).get(id) ?? null;
 }
 
 export function classify(
@@ -140,7 +123,7 @@ async function versionOf(
     // Only opened when the record is actually in this copy: parsing a 300 MB
     // table to learn nothing is the difference between a usable answer and a
     // minute of waiting per version.
-    fields: idx >= 0 ? rowFields(await readFile(ref.path), table, id) : null,
+    fields: idx >= 0 ? rowFields(await readFile(ref.path), table, id, schemaFor(ref.source)) : null,
     merkleRoot: snap.merkleRoot,
     leafIndex: idx >= 0 ? idx : null,
     leafCount: leaves.length,

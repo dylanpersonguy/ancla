@@ -123,6 +123,11 @@ export async function writeSnapshot(path: string, snap: Snapshot): Promise<void>
 export async function readSnapshotHeader(path: string): Promise<Omit<Snapshot, 'records'>> {
   const gunzip = createGunzip();
   const source = createReadStream(path);
+  // A missing or unreadable file emits on the read stream, and piping does not
+  // forward that. Without this the error is unhandled and takes the process down
+  // past every try/catch around the call — which is what "not snapshotted yet"
+  // used to do to `anchor --all` and to the capture inventory.
+  source.on('error', (err) => gunzip.destroy(err));
   source.pipe(gunzip);
   let buf = '';
   try {

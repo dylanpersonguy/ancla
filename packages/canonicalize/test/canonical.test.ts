@@ -148,7 +148,56 @@ test('the schema fingerprint moves when a column is added', () => {
 
 test('the canonicalizer version is pinned', () => {
   // Changing this invalidates every prior anchor. It must be a deliberate act.
-  assert.equal(CANON_VERSION, 'ancla-canon-1');
+  // Moved to v2 on 2026-09-03 with the tolerant quote rule below.
+  assert.equal(CANON_VERSION, 'ancla-canon-2');
+});
+
+test('an unescaped inch mark does not swallow the rest of the file', () => {
+  // The publisher writes RACK DE 19" inside a quoted field without escaping it.
+  // A strict reader closes the field there, desynchronises, and merges every
+  // following row into one. In 202608 that lost 3,820 rows of Sistemas alone.
+  const csv = Buffer.from(
+    'NRO;DESC;COD\r\n' +
+      '1;"GABINETE PARA RACK DE 19" (482,6 mm), COLOR NEGRO";A\r\n' +
+      '2;"SEGUNDA FILA";B\r\n' +
+      '3;"RESPALDO DE 2.4", MECANISMO RÁPIDO";C\r\n' +
+      '4;"CUARTA FILA";D\r\n',
+    'utf8',
+  );
+  const rows = [...parseCsv(csv, 0x3b)];
+  assert.equal(rows.length, 5, 'header plus four rows must survive');
+  assert.deepEqual(rows[1], ['1', 'GABINETE PARA RACK DE 19" (482,6 mm), COLOR NEGRO', 'A']);
+  assert.deepEqual(rows[2], ['2', 'SEGUNDA FILA', 'B']);
+  assert.deepEqual(rows[3], ['3', 'RESPALDO DE 2.4", MECANISMO RÁPIDO', 'C']);
+  assert.deepEqual(rows[4], ['4', 'CUARTA FILA', 'D']);
+});
+
+test('a quoted title with quoted words inside it stays one field', () => {
+  // ARTE "BÁRBARO" Y PRERROMÁNICO, from a real book listing in Sistemas.
+  const csv = Buffer.from('A;B\r\n1;"ARTE "BÁRBARO" Y PRERROMÁNICO"\r\n2;"x"\r\n', 'utf8');
+  const rows = [...parseCsv(csv, 0x3b)];
+  assert.equal(rows.length, 3);
+  assert.deepEqual(rows[1], ['1', 'ARTE "BÁRBARO" Y PRERROMÁNICO']);
+});
+
+test('properly escaped quotes are still unescaped, not doubled up', () => {
+  // The tolerant rule must not break RFC 4180 input, which is most of the mirror.
+  const csv = Buffer.from('A;B\r\n1;"he said ""hello"" twice"\r\n', 'utf8');
+  assert.deepEqual([...parseCsv(csv, 0x3b)][1], ['1', 'he said "hello" twice']);
+});
+
+test('a quote before a delimiter still closes the field', () => {
+  // The whole rule turns on what follows the quote, so the ordinary case needs
+  // pinning as hard as the awkward one.
+  const csv = Buffer.from('A;B;C\r\n"x";"y";"z"\r\n', 'utf8');
+  assert.deepEqual([...parseCsv(csv, 0x3b)][1], ['x', 'y', 'z']);
+});
+
+test('a quoted field may still contain a real line break', () => {
+  const csv = Buffer.from('A;B\r\n1;"line one\r\nline two"\r\n2;"z"\r\n', 'utf8');
+  const rows = [...parseCsv(csv, 0x3b)];
+  assert.equal(rows.length, 3);
+  assert.equal(rows[1]?.[1], 'line one\r\nline two');
 });
 
 test('zip layout does not affect the table name', () => {
